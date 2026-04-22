@@ -2,103 +2,113 @@
 
 [English README](./README.md)
 
-这是一个轻量级的开源 ComfyUI 自定义节点，用于从多种 URI 来源加载图片，并输出标准的 ComfyUI `IMAGE` 与 `MASK` 张量。
+这是一个用于 ComfyUI 的开源自定义节点集合，支持从 URL、本地路径、S3 加载图片，也支持批量加载和批量选择。
 
-## 功能特性
+## 包含的节点
 
-- 支持 `data:` URL（base64 和 URL 编码两种数据格式）
-- 支持通过 `boto3` 读取 `s3://` URI
-- 支持远程 URL：`http://`、`https://`、`ftp://`
-- 支持 `file://` URL
-- 支持本地文件路径（绝对路径、相对路径、Windows 盘符路径）
-- 输出：
-  - `IMAGE`：形状 `[1, H, W, C]`，`float32`，数值范围 `0~1`
-  - `MASK`：形状 `[1, H, W]`，`float32`
-    - 输入图像有 alpha 通道时：`mask = 1 - alpha`
-    - 输入图像无 alpha 通道时：返回全 0 mask
-    - `uri` 为空时：返回 1x1 空白图片和全 1 mask
-  - `HAS_IMAGE`：`BOOLEAN`
-    - 成功加载图片时为 `True`
-    - `uri` 为空并返回占位输出时为 `False`
-- 远程请求使用 Python 标准库 `urllib`（不依赖 `requests`）
-- 可限制远程与 S3 下载大小，避免无上限占用内存
+- `Load Image From URI`（`LoadImageFromURI`）
+- `Load Image From URI (Batch)`（`LoadImageFromURIBatch`）
+- `Batch Load Image Selector`（`BatchLoadImageSelector`）
 
-## 仓库结构
-
-- `__init__.py`：节点实现与 ComfyUI 节点注册
-- `requirements.txt`：Python 依赖列表
-
-## 运行依赖
-
-- ComfyUI 对应的 Python 环境
-- 已安装并可运行的 ComfyUI
-- Python 包：
-  - `numpy`
-  - `torch`
-  - `Pillow`
-  - `boto3`（当前仓库中已声明）
-
-在 ComfyUI 使用的 Python 环境中安装依赖：
-
-```bash
-pip install -r requirements.txt
-```
-
-## 安装方式
-
-将本仓库克隆或复制到 ComfyUI 的 `custom_nodes` 目录：
+## 安装
 
 ```bash
 cd ComfyUI/custom_nodes
 git clone https://github.com/qq1014853731/ComfyUI-Load-Image-From-Data-Url.git
 ```
 
-然后重启 ComfyUI。
+在 ComfyUI 对应 Python 环境安装依赖：
 
-## 节点信息
-
-- **节点类名**：`LoadImageFromURI`
-- **显示名称**：`Load Image From URI`
-- **分类**：`image`
-- **输入参数**：
-  - `uri`（`STRING`，支持多行）：URI / URL / 本地路径
-  - `timeout`（`INT`，默认 `0`，范围 `0~600`）：远程请求超时时间（秒）。设置为 `0` 表示不显式设置超时。
-  - `max_download_bytes`（`INT`，默认 `0`）：HTTP/FTP/S3 下载大小上限，单位为字节。设置为 `0` 表示不限制大小。
-  - `allow_empty`（`BOOLEAN`，默认 `False`）：为 `True` 时，空 `uri` 返回占位输出；为 `False` 时抛错。
-- **输出参数**：
-  - `image`（`IMAGE`）
-  - `mask`（`MASK`）
-  - `has_image`（`BOOLEAN`）
-
-## 使用示例
-
-### 1）Data URL（base64 PNG）
-
-```text
-data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...
+```bash
+pip install -r requirements.txt
 ```
 
-### 2）远程 URL
+安装后重启 ComfyUI。
+
+## 支持的输入
+
+- `data:` URL
+- `http://` / `https://` / `ftp://`
+- `s3://bucket/key`
+- `file://`
+- 本地文件路径
+- Windows 盘符路径，例如 `C:\\example.png`
+- 相对路径，例如 `./input/example.png`
+
+相对路径会基于 ComfyUI 进程当前工作目录解析。
+
+## 节点用法
+
+### Load Image From URI
+
+这个节点用于加载**单张图片**。
+
+- `uri`：图片地址或路径
+- `timeout`：请求超时时间，单位秒，`0` 表示不显式设置超时
+- `max_download_bytes`：下载大小限制，单位字节，`0` 表示不显式限制
+- `allow_empty`：开启后，空输入不会报错，而是返回空占位结果
+
+适合：
+- 加载单张网络图片
+- 加载单张本地图片
+- 加载单张 S3 图片
+
+### Load Image From URI (Batch)
+
+这个节点用于一次加载**多张图片**。
+
+- 在 `uris` 中每行填写一个 URI/路径
+- 其他参数含义与单图节点相同
+- 同一批次内的图片建议保持相同尺寸
+
+适合：
+- 批量加载多张网络图片
+- 批量加载多张本地图片
+- 把多张图片送入支持 batch 输入的节点
+
+### Batch Load Image Selector
+
+这个节点用于从批量图片中取出**其中一张**。
+
+- `index`：要取第几张
+  - `0` = 第一张
+  - `1` = 第二张
+  - `-1` = 最后一张
+- `none_when_missing`：
+  - `True`：索引越界时返回空结果
+  - `False`：索引越界时直接报错
+
+适合：
+- 从 batch 中选出一张图片继续处理
+- 做按索引取图的工作流
+
+## 简单示例
+
+### 单张图片
 
 ```text
 https://example.com/image.png
 ```
 
-### 3）S3 URI
-
 ```text
 s3://my-bucket/path/to/image.png
 ```
 
-S3 访问基于 `boto3` 的默认凭证链，并支持通过环境变量覆盖。
+```text
+./input/example.png
+```
 
-凭证 / 端点生效顺序：
+### 批量图片
 
-1. 节点显式参数
-2. 环境变量
-3. AWS 默认凭证提供链
+```text
+https://example.com/a.png
+https://example.com/b.png
+https://example.com/c.png
+```
 
-常用环境变量：
+## S3 说明
+
+S3 使用 `boto3` 和 AWS 默认凭证链，也支持环境变量：
 
 ```bash
 AWS_ENDPOINT_URL=http://127.0.0.1:9000
@@ -108,70 +118,8 @@ AWS_SECRET_ACCESS_KEY=minioadmin
 AWS_SESSION_TOKEN=...
 ```
 
-说明：
-
-- `timeout` 输入会应用到 S3 连接超时和读取超时。
-- `max_download_bytes` 输入会应用到 HTTP/FTP/S3 响应体读取。
-- 可通过 `AWS_ENDPOINT_URL` 连接 MinIO 或其他 S3 兼容存储服务。
-- 若未显式提供凭证，`boto3` 会回退到 profile / 实例角色 / 默认链。
-- S3 object key 会进行 URL 解码，所以 `s3://bucket/a%20b.png` 会读取 key `a b.png`。
-
-### 4）本地文件路径
-
-```text
-# 绝对路径
-/Users/yourname/Pictures/sample.png
-
-# Windows 指定盘符
-C:\\example.png
-
-# 相对路径（ComfyUI 文件夹）
-./input/example.png
-input/example.png
-```
-
-相对路径会基于 ComfyUI 进程的当前工作目录解析。
-
-Windows 示例：
-
-```text
-C:\Users\yourname\Pictures\sample.png
-```
-
-### 5）File URL
-
-```text
-file:///Users/yourname/Pictures/sample.png
-```
-
-## 空 URI 与 Switch 节点
-
-当 `allow_empty=True` 且 `uri` 为空（或不是字符串）时，节点会返回合法的 1x1 占位图片、全 1 mask，并输出 `has_image = False`。
-
-当 `allow_empty=False`（默认）时，空 `uri` 会抛出 `ValueError`。
-
-## 错误处理
-
-该节点会针对其他常见输入问题抛出明确错误，包括：
-
-- 不支持的 URI scheme
-- `data:` URL 格式不合法
-- 本地文件不存在或路径不是文件
-- S3 对象读取失败（路径无效、权限不足、对象不存在等）
-- 远程 HTTP/URL 拉取失败
-- 图片解码失败
-
-## 贡献方式
-
-欢迎提交 Issue 和 Pull Request。
-
-建议在反馈中包含：
-
-- 清晰的问题描述
-- 复现步骤（如果是 bug）
-- 预期行为与实际行为
-- 环境信息（操作系统、Python、ComfyUI 版本）
+`AWS_ENDPOINT_URL` 可用于 MinIO 或其他 S3 兼容存储。
 
 ## 开源协议
 
-本项目使用 [MIT License](./LICENSE) 开源。
+本项目使用 [MIT License](./LICENSE)。
