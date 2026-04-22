@@ -119,7 +119,15 @@ AWS_SESSION_TOKEN=...
 ### 4）本地文件路径
 
 ```text
+# 绝对路径
 /Users/yourname/Pictures/sample.png
+
+# Windows 指定盘符
+C:\\example.png
+
+# 相对路径（ComfyUI 文件夹）
+./input/example.png
+input/example.png
 ```
 
 相对路径会基于 ComfyUI 进程的当前工作目录解析。

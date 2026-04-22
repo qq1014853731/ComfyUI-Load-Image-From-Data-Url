@@ -119,7 +119,15 @@ Notes:
 ### 4) Local file path
 
 ```text
+# Absolute path
 /Users/yourname/Pictures/sample.png
+
+# Windows specified drive letter
+C:\\example.png
+
+# Relative path (ComfyUI folder)
+./input/example.png
+input/example.png
 ```
 
 Relative paths are resolved from the current working directory of the ComfyUI process.
