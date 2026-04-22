@@ -16,6 +16,10 @@
   - `MASK`：形状 `[1, H, W]`，`float32`
     - 输入图像有 alpha 通道时：`mask = 1 - alpha`
     - 输入图像无 alpha 通道时：返回全 0 mask
+    - `uri` 为空时：返回 1x1 空白图片和全 1 mask
+  - `HAS_IMAGE`：`BOOLEAN`
+    - 成功加载图片时为 `True`
+    - `uri` 为空并返回占位输出时为 `False`
 - 远程请求使用 Python 标准库 `urllib`（不依赖 `requests`）
 - 可限制远程与 S3 下载大小，避免无上限占用内存
 
@@ -60,9 +64,11 @@ git clone https://github.com/qq1014853731/ComfyUI-Load-Image-From-Data-Url.git
   - `uri`（`STRING`，支持多行）：URI / URL / 本地路径
   - `timeout`（`INT`，默认 `0`，范围 `0~600`）：远程请求超时时间（秒）。设置为 `0` 表示不显式设置超时。
   - `max_download_bytes`（`INT`，默认 `0`）：HTTP/FTP/S3 下载大小上限，单位为字节。设置为 `0` 表示不限制大小。
+  - `allow_empty`（`BOOLEAN`，默认 `False`）：为 `True` 时，空 `uri` 返回占位输出；为 `False` 时抛错。
 - **输出参数**：
   - `image`（`IMAGE`）
   - `mask`（`MASK`）
+  - `has_image`（`BOOLEAN`）
 
 ## 使用示例
 
@@ -130,11 +136,16 @@ C:\Users\yourname\Pictures\sample.png
 file:///Users/yourname/Pictures/sample.png
 ```
 
+## 空 URI 与 Switch 节点
+
+当 `allow_empty=True` 且 `uri` 为空（或不是字符串）时，节点会返回合法的 1x1 占位图片、全 1 mask，并输出 `has_image = False`。
+
+当 `allow_empty=False`（默认）时，空 `uri` 会抛出 `ValueError`。
+
 ## 错误处理
 
-该节点会针对常见输入问题抛出明确错误，包括：
+该节点会针对其他常见输入问题抛出明确错误，包括：
 
-- `uri` 为空或不是字符串
 - 不支持的 URI scheme
 - `data:` URL 格式不合法
 - 本地文件不存在或路径不是文件

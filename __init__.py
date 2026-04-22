@@ -41,6 +41,9 @@ class LoadImageFromURI:
     - MASK:  [1, H, W], float32
             If the image has an alpha channel, mask = 1 - alpha.
             If there is no alpha channel, a full-zero mask is returned.
+    - HAS_IMAGE: bool
+            True when uri was non-empty and an image was loaded.
+            False when allow_empty=True and uri was empty.
     """
 
     @classmethod
@@ -72,11 +75,17 @@ class LoadImageFromURI:
                         "step": 1048576
                     }
                 ),
+                "allow_empty": (
+                    "BOOLEAN",
+                    {
+                        "default": False
+                    }
+                ),
             }
         }
 
-    RETURN_TYPES = ("IMAGE", "MASK")
-    RETURN_NAMES = ("image", "mask")
+    RETURN_TYPES = ("IMAGE", "MASK", "BOOLEAN")
+    RETURN_NAMES = ("image", "mask", "has_image")
     FUNCTION = "load_image_from_uri"
     CATEGORY = "image"
     READ_CHUNK_SIZE = 1024 * 1024
@@ -114,6 +123,15 @@ class LoadImageFromURI:
             return f"{byte_count} bytes"
         return f"{byte_count / (1024 * 1024):.1f} MiB"
 
+    @staticmethod
+    def _empty_comfy_tensors():
+        """
+        Return a valid placeholder IMAGE/MASK for optional Switch branches.
+        """
+        image_tensor = torch.zeros((1, 1, 1, 3), dtype=torch.float32)
+        mask_tensor = torch.ones((1, 1, 1), dtype=torch.float32)
+        return image_tensor, mask_tensor
+
     def _read_limited_stream(
         self,
         stream,
@@ -147,18 +165,30 @@ class LoadImageFromURI:
 
         return b"".join(chunks)
 
-    def load_image_from_uri(self, uri: str, timeout: int = 0, max_download_bytes: int = 0):
+    def load_image_from_uri(
+        self,
+        uri: str,
+        timeout: int = 0,
+        max_download_bytes: int = 0,
+        allow_empty: bool = False,
+    ):
         """
         Main entry point:
         1. Read bytes from the URI.
         2. Open the image with PIL.
         3. Convert it to ComfyUI IMAGE / MASK tensors.
         """
-        if not uri or not isinstance(uri, str):
+        if not isinstance(uri, str):
+            if allow_empty:
+                image_tensor, mask_tensor = self._empty_comfy_tensors()
+                return (image_tensor, mask_tensor, False)
             raise ValueError("`uri` must be a non-empty string.")
 
         uri = uri.strip()
         if not uri:
+            if allow_empty:
+                image_tensor, mask_tensor = self._empty_comfy_tensors()
+                return (image_tensor, mask_tensor, False)
             raise ValueError("`uri` must be a non-empty string.")
 
         image_bytes = self._read_uri(
@@ -168,7 +198,7 @@ class LoadImageFromURI:
         )
         pil_image = self._bytes_to_pil_image(image_bytes)
         image_tensor, mask_tensor = self._pil_to_comfy_tensors(pil_image)
-        return (image_tensor, mask_tensor)
+        return (image_tensor, mask_tensor, True)
 
     def _read_uri(self, uri: str, timeout: int, max_download_bytes: int) -> bytes:
         """

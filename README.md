@@ -16,6 +16,10 @@ A lightweight open-source ComfyUI custom node that loads images from multiple UR
   - `MASK`: shape `[1, H, W]`, `float32`
     - If input has alpha channel: `mask = 1 - alpha`
     - If no alpha channel: returns a zero mask
+    - If `uri` is empty: returns a 1x1 blank image with a full mask
+  - `HAS_IMAGE`: `BOOLEAN`
+    - `True` when an image was loaded
+    - `False` when `uri` was empty and the placeholder output was returned
 - Uses Python standard library `urllib` for remote fetch (no `requests` dependency)
 - Can limit remote and S3 download size to avoid unbounded memory use
 
@@ -60,9 +64,11 @@ Then restart ComfyUI.
   - `uri` (`STRING`, multiline): source URI / URL / local path
   - `timeout` (`INT`, default `0`, range `0~600`): remote request timeout in seconds. Set `0` to disable the explicit timeout.
   - `max_download_bytes` (`INT`, default `0`): maximum HTTP/FTP/S3 download size in bytes. Set `0` to disable the size limit.
+  - `allow_empty` (`BOOLEAN`, default `False`): when `True`, empty `uri` returns a placeholder output instead of raising an error.
 - **Outputs**:
   - `image` (`IMAGE`)
   - `mask` (`MASK`)
+  - `has_image` (`BOOLEAN`)
 
 ## Usage Examples
 
@@ -130,11 +136,16 @@ C:\Users\yourname\Pictures\sample.png
 file:///Users/yourname/Pictures/sample.png
 ```
 
+## Empty URI and Switch Nodes
+
+When `allow_empty=True` and `uri` is empty (or not a string), the node returns a valid 1x1 placeholder image, a full mask, and `has_image = False`.
+
+When `allow_empty=False` (default), empty `uri` raises `ValueError`.
+
 ## Error Handling
 
-The node raises clear Python errors for common invalid inputs:
+The node raises clear Python errors for other common invalid inputs:
 
-- Empty or non-string `uri`
 - Unsupported URI scheme
 - Invalid `data:` URL format
 - Missing local file or non-file path
