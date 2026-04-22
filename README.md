@@ -46,7 +46,7 @@ Clone or copy this repository into your ComfyUI custom nodes directory:
 
 ```bash
 cd ComfyUI/custom_nodes
-git clone https://github.com/<your-username>/ComfyUI-Load-Image-From-Data-Url.git
+git clone https://github.com/qq1014853731/ComfyUI-Load-Image-From-Data-Url.git
 ```
 
 Then restart ComfyUI.

@@ -46,7 +46,7 @@ pip install -r requirements.txt
 
 ```bash
 cd ComfyUI/custom_nodes
-git clone https://github.com/<your-username>/ComfyUI-Load-Image-From-Data-Url.git
+git clone https://github.com/qq1014853731/ComfyUI-Load-Image-From-Data-Url.git
 ```
 
 然后重启 ComfyUI。
