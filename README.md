@@ -4,6 +4,8 @@
 
 Open-source ComfyUI custom nodes for loading images from URLs, local paths, and S3, plus simple batch loading and batch selection.
 
+The batch loader uses independent URI fields that can be added with a `+ Add URI` button. It does not split a single string by commas or newlines, so data URLs can contain arbitrary payload text safely.
+
 ## Included Nodes
 
 - `Load Image From URI` (`LoadImageFromURI`)
@@ -24,6 +26,8 @@ pip install -r requirements.txt
 ```
 
 Restart ComfyUI after installation.
+
+After updating this node, refresh the browser page as well so ComfyUI loads the frontend extension for the batch `+ Add URI` button.
 
 ## What You Can Input
 
@@ -57,13 +61,14 @@ Best for:
 
 Use this node when you want to load **multiple images at once**.
 
-- Put **one URI/path per line** into `uris`
+- Click `+ Add URI` to add one independent URI/path field per image
 - Other parameters are the same as the single-image node
 - All images in the same batch should use the same size
 
 Best for:
 - loading a list of images from URLs
 - loading a list of local files
+- loading multiple data URLs without delimiter parsing conflicts
 - sending multiple images into nodes that support batch input
 
 ### Batch Load Image Selector
@@ -100,11 +105,7 @@ s3://my-bucket/path/to/image.png
 
 ### Batch image list
 
-```text
-https://example.com/a.png
-https://example.com/b.png
-https://example.com/c.png
-```
+Use the `+ Add URI` button and put each value in its own URI field.
 
 ## S3 Notes
 

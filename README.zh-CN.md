@@ -4,6 +4,8 @@
 
 这是一个用于 ComfyUI 的开源自定义节点集合，支持从 URL、本地路径、S3 加载图片，也支持批量加载和批量选择。
 
+Batch 加载节点使用可通过 `+ Add URI` 按钮添加的独立 URI 输入框，不再按逗号或换行拆分同一个字符串，因此可以安全处理包含任意 payload 文本的 data URL。
+
 ## 包含的节点
 
 - `Load Image From URI`（`LoadImageFromURI`）
@@ -24,6 +26,8 @@ pip install -r requirements.txt
 ```
 
 安装后重启 ComfyUI。
+
+更新节点后也需要刷新浏览器页面，确保 ComfyUI 加载用于 Batch `+ Add URI` 按钮的前端扩展。
 
 ## 支持的输入
 
@@ -57,13 +61,14 @@ pip install -r requirements.txt
 
 这个节点用于一次加载**多张图片**。
 
-- 在 `uris` 中每行填写一个 URI/路径
+- 点击 `+ Add URI`，为每张图片添加一个独立 URI/路径输入框
 - 其他参数含义与单图节点相同
 - 同一批次内的图片建议保持相同尺寸
 
 适合：
 - 批量加载多张网络图片
 - 批量加载多张本地图片
+- 批量加载多个 data URL，避免分隔符解析冲突
 - 把多张图片送入支持 batch 输入的节点
 
 ### Batch Load Image Selector
@@ -100,11 +105,7 @@ s3://my-bucket/path/to/image.png
 
 ### 批量图片
 
-```text
-https://example.com/a.png
-https://example.com/b.png
-https://example.com/c.png
-```
+使用 `+ Add URI` 按钮添加多个输入框，并把每个 URI 单独填入一个输入框。
 
 ## S3 说明
 

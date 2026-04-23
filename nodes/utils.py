@@ -15,6 +15,25 @@ from botocore.config import Config
 from PIL import Image, ImageOps
 
 
+class ContainsAnyDict(dict):
+    """
+    Accept frontend-created optional inputs whose names are not known in Python.
+
+    The batch node's JavaScript creates widgets named uri_1, uri_2, ...
+    ComfyUI checks optional inputs against this mapping before passing them to
+    the node function, so every key must be treated as a valid multiline string.
+    """
+
+    def __contains__(self, key):
+        return True
+
+    def __getitem__(self, key):
+        return ("STRING", {"multiline": True})
+
+    def get(self, key, default=None):
+        return self[key]
+
+
 class ImageNodeUtils:
     READ_CHUNK_SIZE = 1024 * 1024
 

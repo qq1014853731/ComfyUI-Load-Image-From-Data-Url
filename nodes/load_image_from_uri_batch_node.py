@@ -1,6 +1,8 @@
+import re
+
 import torch
 
-from .utils import ImageNodeUtils
+from .utils import ContainsAnyDict, ImageNodeUtils
 
 
 class LoadImageFromURIBatch(ImageNodeUtils):
@@ -8,14 +10,15 @@ class LoadImageFromURIBatch(ImageNodeUtils):
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "uris": ("STRING", {"multiline": True, "default": ""}),
                 "timeout": ("INT", {"default": 0, "min": 0, "max": 600, "step": 1}),
                 "max_download_bytes": (
                     "INT",
                     {"default": 0, "min": 0, "max": 2147483647, "step": 1048576},
                 ),
                 "allow_empty": ("BOOLEAN", {"default": False}),
-            }
+            },
+            # uri_1, uri_2, ... are created by the frontend extension at runtime.
+            "optional": ContainsAnyDict(),
         }
 
     RETURN_TYPES = ("IMAGE", "MASK", "BOOLEAN", "INT")
@@ -23,25 +26,37 @@ class LoadImageFromURIBatch(ImageNodeUtils):
     FUNCTION = "load_images_from_uri_batch"
     CATEGORY = "image"
 
+    @staticmethod
+    def _uri_sort_key(key: str):
+        # Numeric sorting keeps uri_10 after uri_2. Plain string sorting would not.
+        match = re.match(r"^uri_(\d+)$", key)
+        return (0, int(match.group(1))) if match else (1, key)
+
     def load_images_from_uri_batch(
         self,
-        uris: str,
         timeout: int = 0,
         max_download_bytes: int = 0,
         allow_empty: bool = False,
+        **kwargs,
     ):
-        if not isinstance(uris, str):
-            if allow_empty:
-                image_tensor, mask_tensor = self.empty_comfy_tensors()
-                return (image_tensor, mask_tensor, False, 0)
-            raise ValueError("`uris` must be a string with one URI per line.")
+        uri_list = []
+        # Dynamic URI widgets arrive through kwargs because they are not declared
+        # individually in INPUT_TYPES.
+        for key in sorted(kwargs, key=self._uri_sort_key):
+            if not key.startswith("uri_"):
+                continue
+            uri = kwargs[key]
+            if not isinstance(uri, str):
+                continue
+            uri = uri.strip()
+            if uri:
+                uri_list.append(uri)
 
-        uri_list = [line.strip() for line in uris.splitlines() if line.strip()]
         if not uri_list:
             if allow_empty:
                 image_tensor, mask_tensor = self.empty_comfy_tensors()
                 return (image_tensor, mask_tensor, False, 0)
-            raise ValueError("`uris` is empty. Provide at least one non-empty URI line.")
+            raise ValueError("URI batch is empty. Add at least one non-empty URI item.")
 
         image_tensors = []
         mask_tensors = []
