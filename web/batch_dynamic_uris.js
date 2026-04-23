@@ -2,12 +2,13 @@ import { app } from "../../scripts/app.js";
 
 const NODE_CLASSES = new Set(["LoadImageFromURIBatch", "LoadImageFromURIList"]);
 const URI_NAME_PATTERN = /^uri_(\d+)$/;
-const REMOVE_NAME_PATTERN = /^remove_uri_(\d+)$/;
-const CONTROL_WIDGET_NAMES = new Set(["add_uri", "remove_uri"]);
+const CONTROL_WIDGET_NAMES = new Set(["add_uri"]);
+const DEBUG_PREFIX = "[LoadImageFromURI dynamic uris]";
 const REMOVE_BUTTON_WIDTH = 76;
 const REMOVE_BUTTON_GAP = 8;
 const ROW_HEIGHT = 32;
-const DEBUG_PREFIX = "[LoadImageFromURI dynamic uris]";
+const FIELD_LEFT = 15;
+const FIELD_RADIUS = 8;
 
 console.log(DEBUG_PREFIX, "extension module loaded");
 
@@ -15,12 +16,8 @@ function isUriWidget(widget) {
   return widget?.name && URI_NAME_PATTERN.test(widget.name);
 }
 
-function isRemoveWidget(widget) {
-  return widget?.name && REMOVE_NAME_PATTERN.test(widget.name);
-}
-
 function isDynamicWidget(widget) {
-  return isUriWidget(widget) || isRemoveWidget(widget) || CONTROL_WIDGET_NAMES.has(widget?.name);
+  return isUriWidget(widget) || CONTROL_WIDGET_NAMES.has(widget?.name);
 }
 
 function getUriWidgets(node) {
@@ -35,10 +32,10 @@ function moveWidgetBeforeAddButton(node, widget) {
   const widgets = node.widgets || [];
   const widgetIndex = widgets.indexOf(widget);
   const addButtonIndex = widgets.findIndex((item) => item.name === "add_uri");
-  // Keep URI rows above the add button.
   if (widgetIndex === -1 || addButtonIndex === -1 || widgetIndex < addButtonIndex) {
     return;
   }
+
   widgets.splice(widgetIndex, 1);
   widgets.splice(addButtonIndex, 0, widget);
 }
@@ -46,8 +43,7 @@ function moveWidgetBeforeAddButton(node, widget) {
 function renumberUriWidgets(node) {
   let uriIndex = 1;
 
-  // After deleting any item, rename the remaining URI widgets to keep backend
-  // kwargs continuous and ordered: uri_1, uri_2, uri_3, ...
+  // Keep backend kwargs continuous and ordered: uri_1, uri_2, uri_3, ...
   for (const widget of node.widgets || []) {
     if (isUriWidget(widget)) {
       widget.name = `uri_${uriIndex}`;
@@ -61,7 +57,7 @@ function makeUriWidget(node, name, value = "") {
 
   return {
     name,
-    type: "uri",
+    type: "uri_row",
     value,
     serialize: true,
     options: {},
@@ -71,105 +67,80 @@ function makeUriWidget(node, name, value = "") {
     },
 
     draw(ctx, nodeArg, width, y, height) {
-      console.log(DEBUG_PREFIX, "draw uri widget", {
-        nodeType: nodeArg?.type,
-        name: this.name,
-        y,
-        height,
-        value: this.value,
-      });
-
       const rowHeight = Math.max(ROW_HEIGHT, height || ROW_HEIGHT);
-      const leftX = 15;
-      const rightX = nodeArg.size[0] - 15;
+      const rightX = nodeArg.size[0] - FIELD_LEFT;
       const buttonX = rightX - REMOVE_BUTTON_WIDTH;
-      const fieldWidth = Math.max(80, buttonX - REMOVE_BUTTON_GAP - leftX);
+      const fieldWidth = Math.max(80, buttonX - REMOVE_BUTTON_GAP - FIELD_LEFT);
 
-      ctx.save();
-
-      ctx.strokeStyle = "#777";
-      ctx.fillStyle = "#222";
-      ctx.lineWidth = 1;
-      drawRoundedRect(ctx, leftX, y + 2, fieldWidth, rowHeight - 4, 8);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = "#aaa";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.font = "14px sans-serif";
-      ctx.fillText(this.name, leftX + 10, y + rowHeight / 2);
-
-      ctx.fillStyle = "#eee";
-      ctx.textAlign = "right";
-      ctx.fillText(shortenValue(ctx, this.value, fieldWidth - 90), leftX + fieldWidth - 10, y + rowHeight / 2);
-
-      ctx.strokeStyle = "#777";
-      ctx.fillStyle = "#222";
-      drawRoundedRect(ctx, buttonX, y + 2, REMOVE_BUTTON_WIDTH, rowHeight - 4, 8);
       this._hitAreas = {
         field: {
-          nodeX: leftX,
+          nodeX: FIELD_LEFT,
           localX: 0,
           width: fieldWidth,
         },
         remove: {
           nodeX: buttonX,
-          localX: buttonX - leftX,
+          localX: buttonX - FIELD_LEFT,
           width: REMOVE_BUTTON_WIDTH,
         },
       };
+
+      ctx.save();
+      ctx.textBaseline = "middle";
+      ctx.font = "14px sans-serif";
+      ctx.lineWidth = 1;
+
+      ctx.strokeStyle = "#777";
+      ctx.fillStyle = "#222";
+      drawRoundedRect(ctx, FIELD_LEFT, y + 2, fieldWidth, rowHeight - 4, FIELD_RADIUS);
       ctx.fill();
       ctx.stroke();
+
+      ctx.fillStyle = "#aaa";
+      ctx.textAlign = "left";
+      ctx.fillText(this.name, FIELD_LEFT + 10, y + rowHeight / 2);
+
+      ctx.fillStyle = "#eee";
+      ctx.textAlign = "right";
+      ctx.fillText(shortenValue(ctx, this.value, fieldWidth - 92), FIELD_LEFT + fieldWidth - 10, y + rowHeight / 2);
+
+      ctx.strokeStyle = "#777";
+      ctx.fillStyle = "#222";
+      drawRoundedRect(ctx, buttonX, y + 2, REMOVE_BUTTON_WIDTH, rowHeight - 4, FIELD_RADIUS);
+      ctx.fill();
+      ctx.stroke();
+
       ctx.fillStyle = "#ddd";
       ctx.textAlign = "center";
       ctx.fillText("Remove", buttonX + REMOVE_BUTTON_WIDTH / 2, y + rowHeight / 2);
-
       ctx.restore();
     },
 
     mouse(event, pos, nodeArg) {
-      console.log(DEBUG_PREFIX, "mouse uri widget", {
-        eventType: event?.type,
-        name: this.name,
-        pos,
-        canvasX: event?.canvasX,
-        clientX: event?.clientX,
-        hitAreas: this._hitAreas,
-      });
-
       if (event.type !== "pointerdown" && event.type !== "mousedown") {
         return false;
       }
 
       const localXValues = getPossibleLocalXValues(event, pos, nodeArg);
-      console.log(DEBUG_PREFIX, "mouse local x", {
+      const removeHit = isInsideHitArea(localXValues, this._hitAreas?.remove);
+      const fieldHit = isInsideHitArea(localXValues, this._hitAreas?.field);
+      console.log(DEBUG_PREFIX, "uri row click", {
         name: this.name,
+        removeHit,
+        fieldHit,
         localXValues,
-        removeHit: isInsideHitArea(localXValues, this._hitAreas?.remove),
-        fieldHit: isInsideHitArea(localXValues, this._hitAreas?.field),
       });
 
-      if (isInsideHitArea(localXValues, this._hitAreas?.remove)) {
-        console.log(DEBUG_PREFIX, "remove clicked", { name: this.name });
-        event.preventDefault?.();
-        event.stopPropagation?.();
+      event.preventDefault?.();
+      event.stopPropagation?.();
+
+      if (removeHit) {
         removeUriWidget(nodeArg, this);
         return true;
       }
 
-      if (!isInsideHitArea(localXValues, this._hitAreas?.field)) {
-        return true;
-      }
-
-      event.preventDefault?.();
-      event.stopPropagation?.();
-      console.log(DEBUG_PREFIX, "field clicked", { name: this.name, value: this.value });
-      const nextValue = window.prompt(`Edit ${this.name}`, this.value ?? "");
-      if (nextValue !== null) {
-        console.log(DEBUG_PREFIX, "field changed", { name: this.name, nextValue });
-        this.value = nextValue;
-        nodeArg.setDirtyCanvas(true, true);
+      if (fieldHit) {
+        openUriEditor(this, nodeArg);
       }
       return true;
     },
@@ -184,24 +155,147 @@ function makeUriWidget(node, name, value = "") {
   };
 }
 
+function openUriEditor(widget, node) {
+  ensureUriEditorStyles();
+
+  const overlay = document.createElement("div");
+  overlay.className = "load-image-uri-editor-overlay";
+
+  const dialog = document.createElement("div");
+  dialog.className = "load-image-uri-editor";
+
+  const label = document.createElement("label");
+  label.textContent = "Value";
+
+  const input = document.createElement("textarea");
+  input.value = widget.value ?? "";
+  input.rows = 1;
+  input.spellcheck = false;
+
+  const okButton = document.createElement("button");
+  okButton.type = "button";
+  okButton.textContent = "OK";
+
+  const cancelButton = document.createElement("button");
+  cancelButton.type = "button";
+  cancelButton.textContent = "Cancel";
+
+  const buttonRow = document.createElement("div");
+  buttonRow.className = "load-image-uri-editor-buttons";
+  buttonRow.append(okButton, cancelButton);
+  dialog.append(label, input, buttonRow);
+  overlay.append(dialog);
+  document.body.append(overlay);
+
+  const close = (save) => {
+    if (save) {
+      widget.value = input.value;
+      node.setDirtyCanvas(true, true);
+    }
+    overlay.remove();
+  };
+
+  okButton.addEventListener("click", () => close(true));
+  cancelButton.addEventListener("click", () => close(false));
+  overlay.addEventListener("mousedown", (event) => {
+    if (event.target === overlay) {
+      close(false);
+    }
+  });
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close(false);
+    } else if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      close(true);
+    }
+  });
+
+  requestAnimationFrame(() => {
+    input.focus();
+    input.select();
+  });
+}
+
+function ensureUriEditorStyles() {
+  if (document.getElementById("load-image-uri-editor-styles")) {
+    return;
+  }
+
+  const style = document.createElement("style");
+  style.id = "load-image-uri-editor-styles";
+  style.textContent = `
+.load-image-uri-editor-overlay {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: fixed;
+  z-index: 10000;
+}
+.load-image-uri-editor {
+  align-items: center;
+  background: #2f3030;
+  border: 1px solid #555;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  color: #ddd;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(360px, 56vw) auto;
+  padding: 8px 10px;
+}
+.load-image-uri-editor label {
+  color: #d8d8d8;
+  font: 20px sans-serif;
+}
+.load-image-uri-editor textarea {
+  background: #222;
+  border: 1px solid #555;
+  color: #dce9ff;
+  font: 20px monospace;
+  min-height: 32px;
+  outline: none;
+  padding: 4px 8px;
+  resize: vertical;
+}
+.load-image-uri-editor-buttons {
+  display: flex;
+  gap: 8px;
+}
+.load-image-uri-editor button {
+  background: #d0d0d0;
+  border: 0;
+  border-radius: 18px;
+  color: #555;
+  cursor: pointer;
+  font: 20px sans-serif;
+  min-width: 72px;
+  padding: 5px 14px;
+}
+`;
+  document.head.append(style);
+}
+
 function getPossibleLocalXValues(event, pos, node) {
   const values = [];
 
   if (Array.isArray(pos) && Number.isFinite(pos[0])) {
     values.push(pos[0]);
-    values.push(pos[0] - 15);
+    values.push(pos[0] - FIELD_LEFT);
   }
 
   if (Number.isFinite(event?.canvasX)) {
     values.push(event.canvasX - node.pos[0]);
-    values.push(event.canvasX - node.pos[0] - 15);
+    values.push(event.canvasX - node.pos[0] - FIELD_LEFT);
   }
 
   if (Number.isFinite(event?.clientX) && app.canvas?.canvas) {
     const rect = app.canvas.canvas.getBoundingClientRect();
     const canvasX = (event.clientX - rect.left) / app.canvas.ds.scale - app.canvas.ds.offset[0];
     values.push(canvasX - node.pos[0]);
-    values.push(canvasX - node.pos[0] - 15);
+    values.push(canvasX - node.pos[0] - FIELD_LEFT);
   }
 
   return values;
@@ -267,7 +361,6 @@ function drawRoundedRect(ctx, x, y, width, height, radius) {
 
 function addUriWidget(node, value = "") {
   console.log(DEBUG_PREFIX, "addUriWidget", { nodeType: node?.type, value });
-  // The widget name becomes the backend kwarg name: uri_1, uri_2, ...
   const widget = makeUriWidget(node, `uri_${nextUriIndex(node)}`, value);
   node.addCustomWidget(widget);
   moveWidgetBeforeAddButton(node, widget);
@@ -285,7 +378,6 @@ function removeUriWidget(node, uriWidget) {
   }
 
   widgets.splice(uriIndex, 1);
-
   renumberUriWidgets(node);
   ensureDefaultUriWidget(node);
   resizeNode(node);
@@ -331,8 +423,6 @@ app.registerExtension({
   name: "ComfyUI.LoadImageFromURI.BatchDynamicURIs",
 
   async beforeRegisterNodeDef(nodeType, nodeData) {
-    console.log(DEBUG_PREFIX, "beforeRegisterNodeDef", { name: nodeData?.name });
-
     if (!NODE_CLASSES.has(nodeData.name)) {
       return;
     }
@@ -341,7 +431,6 @@ app.registerExtension({
 
     const originalOnNodeCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function () {
-      console.log(DEBUG_PREFIX, "onNodeCreated", { type: this.type });
       originalOnNodeCreated?.apply(this, arguments);
       this.serialize_widgets = true;
       ensureControls(this);
@@ -351,7 +440,6 @@ app.registerExtension({
 
     const originalConfigure = nodeType.prototype.configure;
     nodeType.prototype.configure = function (info) {
-      console.log(DEBUG_PREFIX, "configure", { type: this.type, info });
       const uriValues = extractSerializedUriValues(info, nodeData);
       originalConfigure?.apply(this, arguments);
       this.serialize_widgets = true;
