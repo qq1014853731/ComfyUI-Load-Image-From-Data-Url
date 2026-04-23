@@ -11,7 +11,7 @@ export function openUriEditor(widget, node) {
   dialog.className = "load-image-uri-editor";
 
   const label = document.createElement("label");
-  label.textContent = "Value";
+  label.textContent = widget.name;
 
   const input = document.createElement("textarea");
   input.value = widget.value ?? "";
@@ -20,10 +20,12 @@ export function openUriEditor(widget, node) {
 
   const okButton = document.createElement("button");
   okButton.type = "button";
+  okButton.className = "load-image-uri-editor-primary";
   okButton.textContent = "OK";
 
   const cancelButton = document.createElement("button");
   cancelButton.type = "button";
+  cancelButton.className = "load-image-uri-editor-secondary";
   cancelButton.textContent = "Cancel";
 
   const buttonRow = document.createElement("div");

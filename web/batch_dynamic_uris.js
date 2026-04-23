@@ -9,6 +9,7 @@ const REMOVE_BUTTON_WIDTH = 96;
 const REMOVE_BUTTON_GAP = 6;
 const ROW_HEIGHT = 20;
 const FIELD_LEFT = 15;
+const ROW_VERTICAL_PADDING = 3;
 const WIDGET_BACKGROUND = "#1f1f1f";
 const WIDGET_BORDER = "#666";
 const WIDGET_TEXT = "#ddd";
@@ -72,9 +73,8 @@ function makeUriWidget(node, name, value = "") {
 
     draw(ctx, nodeArg, width, y, height) {
       const rowHeight = height || ROW_HEIGHT;
-      const widgetY = y + 1;
-      const widgetHeight = Math.max(1, rowHeight - 2);
-      const widgetRadius = widgetHeight / 2;
+      const widgetY = y + ROW_VERTICAL_PADDING;
+      const widgetHeight = Math.max(1, rowHeight - ROW_VERTICAL_PADDING * 2);
       const rightX = nodeArg.size[0] - FIELD_LEFT;
       const buttonX = rightX - REMOVE_BUTTON_WIDTH;
       const fieldWidth = Math.max(80, buttonX - REMOVE_BUTTON_GAP - FIELD_LEFT);
@@ -99,7 +99,7 @@ function makeUriWidget(node, name, value = "") {
 
       ctx.strokeStyle = WIDGET_BORDER;
       ctx.fillStyle = WIDGET_BACKGROUND;
-      drawRoundedRect(ctx, FIELD_LEFT, widgetY, fieldWidth, widgetHeight, widgetRadius);
+      drawPill(ctx, FIELD_LEFT, widgetY, fieldWidth, widgetHeight);
       ctx.fill();
       ctx.stroke();
 
@@ -113,7 +113,7 @@ function makeUriWidget(node, name, value = "") {
 
       ctx.strokeStyle = WIDGET_BORDER;
       ctx.fillStyle = WIDGET_BACKGROUND;
-      drawRoundedRect(ctx, buttonX, widgetY, REMOVE_BUTTON_WIDTH, widgetHeight, widgetRadius);
+      drawPill(ctx, buttonX, widgetY, REMOVE_BUTTON_WIDTH, widgetHeight);
       ctx.fill();
       ctx.stroke();
 
@@ -149,6 +149,61 @@ function makeUriWidget(node, name, value = "") {
       if (fieldHit) {
         openUriEditor(this, nodeArg);
       }
+      return true;
+    },
+
+    onMouseDown(event, pos, nodeArg) {
+      return this.mouse(event, pos, nodeArg);
+    },
+
+    onClick(event, pos, nodeArg) {
+      return this.mouse(event, pos, nodeArg);
+    },
+  };
+}
+
+function makeAddUriWidget(node) {
+  return {
+    name: "add_uri",
+    type: "add_uri_button",
+    value: "add_uri",
+    serialize: false,
+    options: {},
+
+    computeSize(width) {
+      return [width, ROW_HEIGHT];
+    },
+
+    draw(ctx, nodeArg, width, y, height) {
+      const rowHeight = height || ROW_HEIGHT;
+      const widgetY = y + ROW_VERTICAL_PADDING;
+      const widgetHeight = Math.max(1, rowHeight - ROW_VERTICAL_PADDING * 2);
+      const widgetWidth = Math.max(1, nodeArg.size[0] - FIELD_LEFT * 2);
+
+      ctx.save();
+      ctx.textBaseline = "middle";
+      ctx.font = "14px sans-serif";
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = WIDGET_BORDER;
+      ctx.fillStyle = WIDGET_BACKGROUND;
+      drawPill(ctx, FIELD_LEFT, widgetY, widgetWidth, widgetHeight);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = WIDGET_TEXT;
+      ctx.textAlign = "center";
+      ctx.fillText(this.value, FIELD_LEFT + widgetWidth / 2, y + rowHeight / 2);
+      ctx.restore();
+    },
+
+    mouse(event, pos, nodeArg) {
+      if (event.type !== "pointerdown" && event.type !== "mousedown") {
+        return false;
+      }
+
+      event.preventDefault?.();
+      event.stopPropagation?.();
+      addUriWidget(nodeArg);
       return true;
     },
 
@@ -222,6 +277,10 @@ function shortenValue(ctx, value, maxWidth) {
   return ellipsis + text.slice(text.length - start);
 }
 
+function drawPill(ctx, x, y, width, height) {
+  drawRoundedRect(ctx, x, y, width, height, height / 2);
+}
+
 function drawRoundedRect(ctx, x, y, width, height, radius) {
   if (ctx.roundRect) {
     ctx.beginPath();
@@ -276,8 +335,7 @@ function resizeNode(node) {
 function ensureControls(node) {
   if (!node.widgets?.some((widget) => widget.name === "add_uri")) {
     console.log(DEBUG_PREFIX, "ensureControls add button", { nodeType: node?.type });
-    const addButton = node.addWidget("button", "add_uri", "add_uri", () => addUriWidget(node));
-    addButton.serialize = false;
+    node.addCustomWidget(makeAddUriWidget(node));
   }
 }
 
