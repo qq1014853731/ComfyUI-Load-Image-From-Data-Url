@@ -2,10 +2,19 @@ import { app } from "../../scripts/app.js";
 
 const NODE_CLASS = "LoadImageFromURIBatch";
 const URI_NAME_PATTERN = /^uri_(\d+)$/;
+const REMOVE_NAME_PATTERN = /^remove_uri_(\d+)$/;
 const CONTROL_WIDGET_NAMES = new Set(["add_uri", "remove_uri"]);
 
 function isUriWidget(widget) {
   return widget?.name && URI_NAME_PATTERN.test(widget.name);
+}
+
+function isRemoveWidget(widget) {
+  return widget?.name && REMOVE_NAME_PATTERN.test(widget.name);
+}
+
+function isDynamicWidget(widget) {
+  return isUriWidget(widget) || isRemoveWidget(widget) || CONTROL_WIDGET_NAMES.has(widget?.name);
 }
 
 function getUriWidgets(node) {
@@ -13,26 +22,37 @@ function getUriWidgets(node) {
 }
 
 function nextUriIndex(node) {
-  let maxIndex = 0;
-  // Use a monotonically increasing suffix so removing uri_2 does not rename
-  // existing widgets and break serialized workflow values.
-  for (const widget of getUriWidgets(node)) {
-    const match = widget.name.match(URI_NAME_PATTERN);
-    maxIndex = Math.max(maxIndex, Number(match[1]));
-  }
-  return maxIndex + 1;
+  return getUriWidgets(node).length + 1;
 }
 
-function moveWidgetBeforeControls(node, widget) {
+function moveWidgetBeforeAddButton(node, widget) {
   const widgets = node.widgets || [];
   const widgetIndex = widgets.indexOf(widget);
-  const firstControlIndex = widgets.findIndex((item) => CONTROL_WIDGET_NAMES.has(item.name));
-  // Keep URI fields above the add/remove buttons.
-  if (widgetIndex === -1 || firstControlIndex === -1 || widgetIndex < firstControlIndex) {
+  const addButtonIndex = widgets.findIndex((item) => item.name === "add_uri");
+  // Keep URI rows above the add button.
+  if (widgetIndex === -1 || addButtonIndex === -1 || widgetIndex < addButtonIndex) {
     return;
   }
   widgets.splice(widgetIndex, 1);
-  widgets.splice(firstControlIndex, 0, widget);
+  widgets.splice(addButtonIndex, 0, widget);
+}
+
+function renumberUriWidgets(node) {
+  let uriIndex = 1;
+  let lastUriIndex = null;
+
+  // URI and remove widgets are interleaved: uri_1, remove_uri_1, uri_2, ...
+  // After deleting any item, rename the remaining pairs to keep backend kwargs
+  // continuous and ordered.
+  for (const widget of node.widgets || []) {
+    if (isUriWidget(widget)) {
+      widget.name = `uri_${uriIndex}`;
+      lastUriIndex = uriIndex;
+      uriIndex += 1;
+    } else if (isRemoveWidget(widget) && lastUriIndex !== null) {
+      widget.name = `remove_uri_${lastUriIndex}`;
+    }
+  }
 }
 
 function addUriWidget(node, value = "") {
@@ -41,18 +61,34 @@ function addUriWidget(node, value = "") {
     multiline: true,
   });
   widget.serialize = true;
-  moveWidgetBeforeControls(node, widget);
+  moveWidgetBeforeAddButton(node, widget);
+
+  const removeButton = node.addWidget("button", `remove_${widget.name}`, "Remove", () => {
+    removeUriWidget(node, widget);
+  });
+  removeButton.serialize = false;
+  moveWidgetBeforeAddButton(node, removeButton);
+  renumberUriWidgets(node);
   resizeNode(node);
   return widget;
 }
 
-function removeLastUriWidget(node) {
-  const widgets = getUriWidgets(node);
-  const widget = widgets[widgets.length - 1];
-  if (!widget) {
+function removeUriWidget(node, uriWidget) {
+  const widgets = node.widgets || [];
+  const uriIndex = widgets.indexOf(uriWidget);
+  if (uriIndex === -1) {
     return;
   }
-  node.widgets.splice(node.widgets.indexOf(widget), 1);
+
+  const removeButton = widgets[uriIndex + 1];
+  if (isRemoveWidget(removeButton)) {
+    widgets.splice(uriIndex, 2);
+  } else {
+    widgets.splice(uriIndex, 1);
+  }
+
+  renumberUriWidgets(node);
+  ensureDefaultUriWidget(node);
   resizeNode(node);
 }
 
@@ -67,13 +103,6 @@ function ensureControls(node) {
   if (!node.widgets?.some((widget) => widget.name === "add_uri")) {
     const addButton = node.addWidget("button", "add_uri", "+ Add URI", () => addUriWidget(node));
     addButton.serialize = false;
-  }
-
-  if (!node.widgets?.some((widget) => widget.name === "remove_uri")) {
-    const removeButton = node.addWidget("button", "remove_uri", "Remove Last URI", () => {
-      removeLastUriWidget(node);
-    });
-    removeButton.serialize = false;
   }
 }
 
@@ -119,11 +148,8 @@ app.registerExtension({
       this.serialize_widgets = true;
 
       // Rebuild dynamic widgets after ComfyUI restores Python-defined widgets.
-      for (const widget of [...getUriWidgets(this)]) {
-        this.widgets.splice(this.widgets.indexOf(widget), 1);
-      }
       for (const widget of [...(this.widgets || [])]) {
-        if (CONTROL_WIDGET_NAMES.has(widget.name)) {
+        if (isDynamicWidget(widget)) {
           this.widgets.splice(this.widgets.indexOf(widget), 1);
         }
       }

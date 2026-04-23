@@ -105,7 +105,7 @@ s3://my-bucket/path/to/image.png
 
 ### Batch image list
 
-Use the `+ Add URI` button and put each value in its own URI field.
+Use the `+ Add URI` button and put each value in its own URI field. Each URI field has its own `Remove` button, and remaining fields are renumbered continuously after deletion.
 
 ## S3 Notes
 
