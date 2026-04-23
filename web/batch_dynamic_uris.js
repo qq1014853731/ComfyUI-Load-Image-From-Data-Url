@@ -7,6 +7,9 @@ const CONTROL_WIDGET_NAMES = new Set(["add_uri", "remove_uri"]);
 const REMOVE_BUTTON_WIDTH = 76;
 const REMOVE_BUTTON_GAP = 8;
 const ROW_HEIGHT = 32;
+const DEBUG_PREFIX = "[LoadImageFromURI dynamic uris]";
+
+console.log(DEBUG_PREFIX, "extension module loaded");
 
 function isUriWidget(widget) {
   return widget?.name && URI_NAME_PATTERN.test(widget.name);
@@ -54,17 +57,28 @@ function renumberUriWidgets(node) {
 }
 
 function makeUriWidget(node, name, value = "") {
+  console.log(DEBUG_PREFIX, "makeUriWidget", { nodeType: node?.type, name, value });
+
   return {
     name,
-    type: "text",
+    type: "uri",
     value,
     serialize: true,
+    options: {},
 
     computeSize(width) {
       return [width, ROW_HEIGHT];
     },
 
     draw(ctx, nodeArg, width, y, height) {
+      console.log(DEBUG_PREFIX, "draw uri widget", {
+        nodeType: nodeArg?.type,
+        name: this.name,
+        y,
+        height,
+        value: this.value,
+      });
+
       const rowHeight = Math.max(ROW_HEIGHT, height || ROW_HEIGHT);
       const leftX = 15;
       const rightX = nodeArg.size[0] - 15;
@@ -115,12 +129,29 @@ function makeUriWidget(node, name, value = "") {
     },
 
     mouse(event, pos, nodeArg) {
+      console.log(DEBUG_PREFIX, "mouse uri widget", {
+        eventType: event?.type,
+        name: this.name,
+        pos,
+        canvasX: event?.canvasX,
+        clientX: event?.clientX,
+        hitAreas: this._hitAreas,
+      });
+
       if (event.type !== "pointerdown" && event.type !== "mousedown") {
         return false;
       }
 
       const localXValues = getPossibleLocalXValues(event, pos, nodeArg);
+      console.log(DEBUG_PREFIX, "mouse local x", {
+        name: this.name,
+        localXValues,
+        removeHit: isInsideHitArea(localXValues, this._hitAreas?.remove),
+        fieldHit: isInsideHitArea(localXValues, this._hitAreas?.field),
+      });
+
       if (isInsideHitArea(localXValues, this._hitAreas?.remove)) {
+        console.log(DEBUG_PREFIX, "remove clicked", { name: this.name });
         event.preventDefault?.();
         event.stopPropagation?.();
         removeUriWidget(nodeArg, this);
@@ -133,8 +164,10 @@ function makeUriWidget(node, name, value = "") {
 
       event.preventDefault?.();
       event.stopPropagation?.();
+      console.log(DEBUG_PREFIX, "field clicked", { name: this.name, value: this.value });
       const nextValue = window.prompt(`Edit ${this.name}`, this.value ?? "");
       if (nextValue !== null) {
+        console.log(DEBUG_PREFIX, "field changed", { name: this.name, nextValue });
         this.value = nextValue;
         nodeArg.setDirtyCanvas(true, true);
       }
@@ -233,6 +266,7 @@ function drawRoundedRect(ctx, x, y, width, height, radius) {
 }
 
 function addUriWidget(node, value = "") {
+  console.log(DEBUG_PREFIX, "addUriWidget", { nodeType: node?.type, value });
   // The widget name becomes the backend kwarg name: uri_1, uri_2, ...
   const widget = makeUriWidget(node, `uri_${nextUriIndex(node)}`, value);
   node.addCustomWidget(widget);
@@ -243,6 +277,7 @@ function addUriWidget(node, value = "") {
 }
 
 function removeUriWidget(node, uriWidget) {
+  console.log(DEBUG_PREFIX, "removeUriWidget", { nodeType: node?.type, widgetName: uriWidget?.name });
   const widgets = node.widgets || [];
   const uriIndex = widgets.indexOf(uriWidget);
   if (uriIndex === -1) {
@@ -265,6 +300,7 @@ function resizeNode(node) {
 
 function ensureControls(node) {
   if (!node.widgets?.some((widget) => widget.name === "add_uri")) {
+    console.log(DEBUG_PREFIX, "ensureControls add button", { nodeType: node?.type });
     const addButton = node.addWidget("button", "add_uri", "+ Add URI", () => addUriWidget(node));
     addButton.serialize = false;
   }
@@ -272,6 +308,7 @@ function ensureControls(node) {
 
 function ensureDefaultUriWidget(node) {
   if (!getUriWidgets(node).length) {
+    console.log(DEBUG_PREFIX, "ensureDefaultUriWidget", { nodeType: node?.type });
     addUriWidget(node);
   }
 }
@@ -294,12 +331,17 @@ app.registerExtension({
   name: "ComfyUI.LoadImageFromURI.BatchDynamicURIs",
 
   async beforeRegisterNodeDef(nodeType, nodeData) {
+    console.log(DEBUG_PREFIX, "beforeRegisterNodeDef", { name: nodeData?.name });
+
     if (!NODE_CLASSES.has(nodeData.name)) {
       return;
     }
 
+    console.log(DEBUG_PREFIX, "hook node type", { name: nodeData.name });
+
     const originalOnNodeCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function () {
+      console.log(DEBUG_PREFIX, "onNodeCreated", { type: this.type });
       originalOnNodeCreated?.apply(this, arguments);
       this.serialize_widgets = true;
       ensureControls(this);
@@ -309,6 +351,7 @@ app.registerExtension({
 
     const originalConfigure = nodeType.prototype.configure;
     nodeType.prototype.configure = function (info) {
+      console.log(DEBUG_PREFIX, "configure", { type: this.type, info });
       const uriValues = extractSerializedUriValues(info, nodeData);
       originalConfigure?.apply(this, arguments);
       this.serialize_widgets = true;
