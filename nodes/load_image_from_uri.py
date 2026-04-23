@@ -1,7 +1,8 @@
-from .utils import ImageNodeUtils
+from .shared.tensors import empty_comfy_tensors
+from .utils import load_uri_to_tensors
 
 
-class LoadImageFromURI(ImageNodeUtils):
+class LoadImageFromURI:
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -28,20 +29,15 @@ class LoadImageFromURI(ImageNodeUtils):
         max_download_bytes: int = 0,
         allow_empty: bool = False,
     ):
-        if not isinstance(uri, str):
+        if not isinstance(uri, str) or not uri.strip():
             if allow_empty:
-                image_tensor, mask_tensor = self.empty_comfy_tensors()
-                return (image_tensor, mask_tensor, False)
+                image_tensor, mask_tensor = empty_comfy_tensors()
+                return image_tensor, mask_tensor, False
             raise ValueError("`uri` must be a non-empty string.")
 
-        uri = uri.strip()
-        if not uri:
-            if allow_empty:
-                image_tensor, mask_tensor = self.empty_comfy_tensors()
-                return (image_tensor, mask_tensor, False)
-            raise ValueError("`uri` must be a non-empty string.")
-
-        image_bytes = self.read_uri(uri, timeout=timeout, max_download_bytes=max_download_bytes)
-        pil_image = self.bytes_to_pil_image(image_bytes)
-        image_tensor, mask_tensor = self.pil_to_comfy_tensors(pil_image)
-        return (image_tensor, mask_tensor, True)
+        image_tensor, mask_tensor = load_uri_to_tensors(
+            uri.strip(),
+            timeout=timeout,
+            max_download_bytes=max_download_bytes,
+        )
+        return image_tensor, mask_tensor, True

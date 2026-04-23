@@ -1,8 +1,9 @@
-from .load_image_from_uri_batch import LoadImageFromURIBatch
-from .utils import ContainsAnyDict
+from .shared.dynamic_inputs import ContainsAnyDict, collect_uri_list
+from .shared.tensors import empty_comfy_tensors
+from .utils import load_uri_to_tensors
 
 
-class LoadImageFromURIList(LoadImageFromURIBatch):
+class LoadImageFromURIList:
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -31,21 +32,23 @@ class LoadImageFromURIList(LoadImageFromURIBatch):
         allow_empty: bool = False,
         **kwargs,
     ):
-        uri_list = self.collect_uri_list(kwargs)
+        uri_list = collect_uri_list(kwargs)
 
         if not uri_list:
             if allow_empty:
-                image_tensor, mask_tensor = self.empty_comfy_tensors()
-                return ([image_tensor], [mask_tensor], False, 0)
+                image_tensor, mask_tensor = empty_comfy_tensors()
+                return [image_tensor], [mask_tensor], False, 0
             raise ValueError("URI list is empty. Add at least one non-empty URI item.")
 
         image_tensors = []
         mask_tensors = []
         for uri in uri_list:
-            image_bytes = self.read_uri(uri, timeout=timeout, max_download_bytes=max_download_bytes)
-            pil_image = self.bytes_to_pil_image(image_bytes)
-            image_tensor, mask_tensor = self.pil_to_comfy_tensors(pil_image)
+            image_tensor, mask_tensor = load_uri_to_tensors(
+                uri,
+                timeout=timeout,
+                max_download_bytes=max_download_bytes,
+            )
             image_tensors.append(image_tensor)
             mask_tensors.append(mask_tensor)
 
-        return (image_tensors, mask_tensors, True, len(uri_list))
+        return image_tensors, mask_tensors, True, len(uri_list)
