@@ -138,7 +138,7 @@ Best for:
 
 ### Lazy Gate workflow example
 
-Lazy Gate workflow example
+![Lazy Gate workflow example](./docs/example.png)
 
 ### Single image
 
