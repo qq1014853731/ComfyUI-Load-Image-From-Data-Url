@@ -185,7 +185,7 @@ function makeAddUriWidget(node) {
       ctx.lineWidth = 1;
       ctx.strokeStyle = WIDGET_BORDER;
       ctx.fillStyle = WIDGET_BACKGROUND;
-      drawPill(ctx, FIELD_LEFT, widgetY, widgetWidth, widgetHeight);
+      drawPill(ctx, 15, widgetY, widgetWidth, widgetHeight);
       ctx.fill();
       ctx.stroke();
 
