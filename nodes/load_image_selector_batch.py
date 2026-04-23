@@ -20,7 +20,7 @@ class LoadImageSelectorBatch:
     RETURN_TYPES = ("IMAGE", "MASK", "BOOLEAN")
     RETURN_NAMES = ("image", "mask", "has_image")
     FUNCTION = "select"
-    CATEGORY = "image"
+    CATEGORY = "lifu/image"
 
     def select(self, index: int = 0, image_missing: str = "None", mask_missing: str = "None", image=None, mask=None):
         return select_from_batch(

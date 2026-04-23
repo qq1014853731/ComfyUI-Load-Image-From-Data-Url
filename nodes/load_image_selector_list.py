@@ -29,7 +29,7 @@ class LoadImageSelectorList:
     RETURN_NAMES = ("image", "mask", "has_image")
     INPUT_IS_LIST = True
     FUNCTION = "select"
-    CATEGORY = "image"
+    CATEGORY = "lifu/image"
 
     def select(self, index=None, image_missing=None, mask_missing=None, image=None, mask=None):
         return select_from_list(

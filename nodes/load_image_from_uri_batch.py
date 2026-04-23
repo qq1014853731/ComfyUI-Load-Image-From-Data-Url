@@ -28,7 +28,7 @@ class LoadImageFromURIBatch:
     RETURN_TYPES = ("IMAGE", "MASK", "BOOLEAN", "INT")
     RETURN_NAMES = ("image", "mask", "has_image", "count")
     FUNCTION = "load_images_from_uri_batch"
-    CATEGORY = "image"
+    CATEGORY = "lifu/image"
 
     def load_images_from_uri_batch(
         self,

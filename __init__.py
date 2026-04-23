@@ -4,6 +4,7 @@ from .nodes import (
     LoadImageFromURIList,
     LoadImageSelectorBatch,
     LoadImageSelectorList,
+    LazyGateAny
 )
 
 WEB_DIRECTORY = "./web"
@@ -15,6 +16,7 @@ NODE_CLASS_MAPPINGS = {
     "LoadImageFromURIList": LoadImageFromURIList,
     "LoadImageSelectorBatch": LoadImageSelectorBatch,
     "LoadImageSelectorList": LoadImageSelectorList,
+    "LazyGateAny": LazyGateAny,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -23,6 +25,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "LoadImageFromURIList": "Load Image From URI (List)",
     "LoadImageSelectorBatch": "Load Image Selector (Batch)",
     "LoadImageSelectorList": "Load Image Selector (List)",
+    "LazyGateAny": "Lazy Gate (Any)",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

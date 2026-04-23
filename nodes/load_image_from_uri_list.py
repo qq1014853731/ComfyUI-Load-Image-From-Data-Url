@@ -24,7 +24,7 @@ class LoadImageFromURIList:
     RETURN_NAMES = ("image", "mask", "has_image", "count")
     OUTPUT_IS_LIST = (True, True, False, False)
     FUNCTION = "load_images_from_uri_list"
-    CATEGORY = "image"
+    CATEGORY = "lifu/image"
 
     def load_images_from_uri_list(
         self,
