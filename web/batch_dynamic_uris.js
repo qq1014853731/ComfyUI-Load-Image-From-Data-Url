@@ -4,6 +4,8 @@ const NODE_CLASS = "LoadImageFromURIBatch";
 const URI_NAME_PATTERN = /^uri_(\d+)$/;
 const REMOVE_NAME_PATTERN = /^remove_uri_(\d+)$/;
 const CONTROL_WIDGET_NAMES = new Set(["add_uri", "remove_uri"]);
+const REMOVE_BUTTON_WIDTH = 76;
+const REMOVE_BUTTON_GAP = 8;
 
 function isUriWidget(widget) {
   return widget?.name && URI_NAME_PATTERN.test(widget.name);
@@ -39,20 +41,76 @@ function moveWidgetBeforeAddButton(node, widget) {
 
 function renumberUriWidgets(node) {
   let uriIndex = 1;
-  let lastUriIndex = null;
 
-  // URI and remove widgets are interleaved: uri_1, remove_uri_1, uri_2, ...
-  // After deleting any item, rename the remaining pairs to keep backend kwargs
-  // continuous and ordered.
+  // After deleting any item, rename the remaining URI widgets to keep backend
+  // kwargs continuous and ordered: uri_1, uri_2, uri_3, ...
   for (const widget of node.widgets || []) {
     if (isUriWidget(widget)) {
       widget.name = `uri_${uriIndex}`;
-      lastUriIndex = uriIndex;
       uriIndex += 1;
-    } else if (isRemoveWidget(widget) && lastUriIndex !== null) {
-      widget.name = `remove_uri_${lastUriIndex}`;
     }
   }
+}
+
+function decorateUriWidget(node, widget) {
+  const originalDraw = widget.draw;
+  const originalMouse = widget.mouse;
+
+  widget.draw = function (ctx, nodeArg, width, y, height) {
+    const textWidth = Math.max(80, width - REMOVE_BUTTON_WIDTH - REMOVE_BUTTON_GAP);
+    originalDraw?.call(this, ctx, nodeArg, textWidth, y, height);
+
+    const buttonX = nodeArg.size[0] - REMOVE_BUTTON_WIDTH - 15;
+    const buttonY = y;
+    ctx.save();
+    ctx.strokeStyle = "#777";
+    ctx.fillStyle = "#222";
+    ctx.lineWidth = 1;
+    drawRoundedRect(ctx, buttonX, buttonY + 2, REMOVE_BUTTON_WIDTH, height - 4, 8);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#ddd";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "14px sans-serif";
+    ctx.fillText("Remove", buttonX + REMOVE_BUTTON_WIDTH / 2, buttonY + height / 2);
+    ctx.restore();
+  };
+
+  widget.mouse = function (event, pos, nodeArg) {
+    const buttonX = nodeArg.size[0] - REMOVE_BUTTON_WIDTH - 15;
+    const insideRemoveButton = pos[0] >= buttonX && pos[0] <= buttonX + REMOVE_BUTTON_WIDTH;
+
+    if (insideRemoveButton && (event.type === "pointerdown" || event.type === "mousedown")) {
+      removeUriWidget(nodeArg, widget);
+      return true;
+    }
+
+    return originalMouse?.call(this, event, pos, nodeArg);
+  };
+
+  return widget;
+}
+
+function drawRoundedRect(ctx, x, y, width, height, radius) {
+  if (ctx.roundRect) {
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, radius);
+    return;
+  }
+
+  const right = x + width;
+  const bottom = y + height;
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(right - radius, y);
+  ctx.quadraticCurveTo(right, y, right, y + radius);
+  ctx.lineTo(right, bottom - radius);
+  ctx.quadraticCurveTo(right, bottom, right - radius, bottom);
+  ctx.lineTo(x + radius, bottom);
+  ctx.quadraticCurveTo(x, bottom, x, bottom - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
 }
 
 function addUriWidget(node, value = "") {
@@ -61,13 +119,8 @@ function addUriWidget(node, value = "") {
     multiline: true,
   });
   widget.serialize = true;
+  decorateUriWidget(node, widget);
   moveWidgetBeforeAddButton(node, widget);
-
-  const removeButton = node.addWidget("button", `remove_${widget.name}`, "Remove", () => {
-    removeUriWidget(node, widget);
-  });
-  removeButton.serialize = false;
-  moveWidgetBeforeAddButton(node, removeButton);
   renumberUriWidgets(node);
   resizeNode(node);
   return widget;
@@ -80,12 +133,7 @@ function removeUriWidget(node, uriWidget) {
     return;
   }
 
-  const removeButton = widgets[uriIndex + 1];
-  if (isRemoveWidget(removeButton)) {
-    widgets.splice(uriIndex, 2);
-  } else {
-    widgets.splice(uriIndex, 1);
-  }
+  widgets.splice(uriIndex, 1);
 
   renumberUriWidgets(node);
   ensureDefaultUriWidget(node);
