@@ -52,7 +52,10 @@ Use this node when you want to load **one image**.
 - `uri`: image address or path
 - `timeout`: request timeout in seconds, `0` means no explicit timeout
 - `max_download_bytes`: maximum download size in bytes, `0` means no explicit limit
-- `allow_empty`: if enabled, empty input returns an empty placeholder instead of stopping the workflow
+- `uri_missing`: how to handle an empty URI
+  - `None`: return `None` for image/mask
+  - `Placeholder`: return a ComfyUI-compatible empty tensor
+  - `Throw error`: stop with an error
 
 Best for:
 - loading one remote image
@@ -65,6 +68,7 @@ Use this node when you want to load **multiple images as one batch tensor**.
 
 - Click `+ Add URI` to add one independent URI/path field per image
 - Other parameters are the same as the single-image node
+- Empty URI items use `uri_missing`; `None` skips that item in batch output, `Placeholder` keeps its position with an empty tensor, and `Throw error` stops.
 - `size_mode`:
   - `pad_to_max`: output one batch tensor by padding smaller images/masks to the largest width and height
   - `resize_to_first`: output one batch tensor by resizing later images/masks to the first image size
@@ -81,6 +85,7 @@ Use this node when you want to load **multiple images while preserving each orig
 - Click `+ Add URI` to add one independent URI/path field per image
 - Outputs a ComfyUI list of individual `IMAGE` / `MASK` tensors
 - Does not resize or pad images
+- Empty URI items use `uri_missing`; `None` outputs `None` for that list item, `Placeholder` outputs an empty tensor, and `Throw error` stops.
 
 ### Load Image Selector (Batch)
 
@@ -90,12 +95,13 @@ Use this node after `Load Image From URI (Batch)` when you want to pick **one im
   - `0` = first image
   - `1` = second image
   - `-1` = last image
-- `none_when_missing`:
-  - `True`: if index is out of range, return an empty result
-  - `False`: if index is out of range, stop with an error
-- `image` and `mask` are optional, but at least one must be connected.
-  - image only: selector creates a zero mask with the selected image size
-  - mask only: selector creates a black image with the selected mask size
+- `image_missing`: how to handle a missing selected image
+- `mask_missing`: how to handle a missing selected mask
+  - `None`: return `None` for that output
+  - `Placeholder`: return a ComfyUI-compatible empty tensor for that output
+  - `Throw error`: stop with an error
+- `image` and `mask` are optional and handled independently.
+- Out-of-range `index` is treated as missing for both `image` and `mask`.
 
 Best for:
 - selecting one image from a loaded batch tensor

@@ -1,3 +1,4 @@
+from .shared.missing import MISSING_POLICIES, validate_missing_policy
 from .shared.tensors import empty_comfy_tensors
 from .utils import load_uri_to_tensors
 
@@ -13,7 +14,7 @@ class LoadImageFromURI:
                     "INT",
                     {"default": 0, "min": 0, "max": 2147483647, "step": 1048576},
                 ),
-                "allow_empty": ("BOOLEAN", {"default": False}),
+                "uri_missing": (list(MISSING_POLICIES), {"default": "None"}),
             }
         }
 
@@ -27,13 +28,17 @@ class LoadImageFromURI:
         uri: str,
         timeout: int = 0,
         max_download_bytes: int = 0,
-        allow_empty: bool = False,
+        uri_missing: str = "None",
     ):
+        validate_missing_policy(uri_missing, "uri_missing")
+
         if not isinstance(uri, str) or not uri.strip():
-            if allow_empty:
-                image_tensor, mask_tensor = empty_comfy_tensors()
-                return image_tensor, mask_tensor, False
-            raise ValueError("`uri` must be a non-empty string.")
+            if uri_missing == "None":
+                return None, None, False
+            if uri_missing == "Throw error":
+                raise ValueError("`uri` must be a non-empty string.")
+            image_tensor, mask_tensor = empty_comfy_tensors()
+            return image_tensor, mask_tensor, False
 
         image_tensor, mask_tensor = load_uri_to_tensors(
             uri.strip(),

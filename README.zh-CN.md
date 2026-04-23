@@ -52,7 +52,10 @@ pip install -r requirements.txt
 - `uri`：图片地址或路径
 - `timeout`：请求超时时间，单位秒，`0` 表示不显式设置超时
 - `max_download_bytes`：下载大小限制，单位字节，`0` 表示不显式限制
-- `allow_empty`：开启后，空输入不会报错，而是返回空占位结果
+- `uri_missing`：URI 为空时如何处理
+  - `None`：image/mask 返回 `None`
+  - `Placeholder`：返回 ComfyUI 兼容的空 tensor
+  - `Throw error`：直接报错
 
 适合：
 - 加载单张网络图片
@@ -65,6 +68,7 @@ pip install -r requirements.txt
 
 - 点击 `+ Add URI`，为每张图片添加一个独立 URI/路径输入框
 - 其他参数含义与单图节点相同
+- 空 URI item 会按 `uri_missing` 处理；`None` 会在 batch 输出中跳过该项，`Placeholder` 会用空 tensor 保留该位置，`Throw error` 会直接报错。
 - `size_mode`：
   - `pad_to_max`：输出一个 batch tensor，将较小图片和 mask 补边到最大宽高
   - `resize_to_first`：输出一个 batch tensor，将后续图片和 mask 缩放到第一张图片尺寸
@@ -81,6 +85,7 @@ pip install -r requirements.txt
 - 点击 `+ Add URI`，为每张图片添加一个独立 URI/路径输入框
 - 输出 ComfyUI 图片 / mask 列表
 - 不缩放、不补边
+- 空 URI item 会按 `uri_missing` 处理；`None` 会在该 list item 输出 `None`，`Placeholder` 会输出空 tensor，`Throw error` 会直接报错。
 
 ### Load Image Selector (Batch)
 
@@ -90,12 +95,13 @@ pip install -r requirements.txt
   - `0` = 第一张
   - `1` = 第二张
   - `-1` = 最后一张
-- `none_when_missing`：
-  - `True`：索引越界时返回空结果
-  - `False`：索引越界时直接报错
-- `image` 和 `mask` 都是可选输入，但至少需要连接其中一个。
-  - 只连接 image：Selector 会按选中图片尺寸创建全 0 mask
-  - 只连接 mask：Selector 会按选中 mask 尺寸创建黑色 image
+- `image_missing`：选中的 image 缺失时如何处理
+- `mask_missing`：选中的 mask 缺失时如何处理
+  - `None`：该输出返回 `None`
+  - `Placeholder`：该输出返回 ComfyUI 兼容的空 tensor
+  - `Throw error`：直接报错
+- `image` 和 `mask` 都是可选输入，并且会分别按各自策略处理。
+- `index` 越界时，`image` 和 `mask` 都视为缺失。
 
 适合：
 - 从 batch tensor 中选出一张图片继续处理

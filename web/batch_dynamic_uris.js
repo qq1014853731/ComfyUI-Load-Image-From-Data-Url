@@ -283,8 +283,8 @@ function extractSerializedUriValues(info, nodeData) {
   }
 
   // Base widgets from Python are serialized first:
-  // Batch: timeout, max_download_bytes, size_mode, allow_empty.
-  // List: timeout, max_download_bytes, allow_empty.
+  // Batch: timeout, max_download_bytes, size_mode, uri_missing.
+  // List: timeout, max_download_bytes, uri_missing.
   // URI widgets are added by this extension after those base widgets.
   const baseWidgetCount = nodeData.name === "LoadImageFromURIBatch" ? 4 : 3;
   return values.slice(baseWidgetCount).filter((value) => typeof value === "string");

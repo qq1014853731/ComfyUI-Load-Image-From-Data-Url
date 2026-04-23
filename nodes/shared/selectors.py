@@ -1,69 +1,97 @@
-from .tensors import empty_comfy_tensors, empty_image_like, empty_mask_like, is_placeholder, normalize_index
+from .missing import MISSING_POLICIES, validate_missing_policy
+from .tensors import (
+    empty_comfy_tensors,
+    empty_image_like,
+    empty_mask_like,
+    is_placeholder_image,
+    is_placeholder_mask,
+    normalize_index,
+)
 
 
-def select_from_batch(image, mask, index: int, none_when_missing: bool):
-    if image is None and mask is None:
-        raise ValueError("At least one input is required: connect `image`, `mask`, or both.")
+def select_from_batch(image, mask, index: int, image_missing: str, mask_missing: str):
+    validate_missing_policy(image_missing, "image_missing")
+    validate_missing_policy(mask_missing, "mask_missing")
 
-    if image is None:
-        image = empty_image_like(mask)
-    if mask is None:
-        mask = empty_mask_like(image)
+    if image is not None and image.ndim != 4:
+        raise ValueError("Invalid batch tensor shape for `image`.")
+    if mask is not None and mask.ndim != 3:
+        raise ValueError("Invalid batch tensor shape for `mask`.")
 
-    if image.ndim != 4 or mask.ndim != 3:
-        raise ValueError("Invalid batch tensor shape for `image` or `mask`.")
+    selected_image = select_optional_batch_tensor(image, index)
+    selected_mask = select_optional_batch_tensor(mask, index)
+    return resolve_selected(selected_image, selected_mask, image_missing, mask_missing)
 
-    batch_size = int(image.shape[0])
-    if batch_size <= 0:
-        if none_when_missing:
-            empty_image, empty_mask = empty_comfy_tensors()
-            return empty_image, empty_mask, False
-        raise ValueError("Image batch is empty.")
 
-    selected_index = normalize_index(index, batch_size)
+def select_from_list(images, masks, index: int, image_missing: str, mask_missing: str):
+    validate_missing_policy(image_missing, "image_missing")
+    validate_missing_policy(mask_missing, "mask_missing")
+
+    selected_image = select_optional_list_tensor(images, index)
+    selected_mask = select_optional_list_tensor(masks, index)
+    return resolve_selected(selected_image, selected_mask, image_missing, mask_missing)
+
+
+def select_optional_batch_tensor(tensor, index: int):
+    if tensor is None:
+        return None
+    selected_index = normalize_index(index, int(tensor.shape[0]))
     if selected_index is None:
-        if none_when_missing:
-            empty_image, empty_mask = empty_comfy_tensors()
-            return empty_image, empty_mask, False
-        raise ValueError(
-            f"Index out of range: index={index}, valid range is [0, {batch_size - 1}] or negative equivalent."
-        )
-
-    selected_image = image[selected_index : selected_index + 1]
-    selected_mask = mask[selected_index : selected_index + 1]
-    return validate_selected(selected_image, selected_mask, none_when_missing)
+        return None
+    return tensor[selected_index : selected_index + 1]
 
 
-def select_from_list(images, masks, index: int, none_when_missing: bool):
-    if images is None and masks is None:
-        raise ValueError("At least one input is required: connect `image`, `mask`, or both.")
-
-    if images is None:
-        images = [empty_image_like(mask_tensor) for mask_tensor in masks]
-    if masks is None:
-        masks = [empty_mask_like(image_tensor) for image_tensor in images]
-
-    if len(images) != len(masks):
-        raise ValueError(f"Image/mask list length mismatch: {len(images)} images, {len(masks)} masks.")
-
-    selected_index = normalize_index(index, len(images))
+def select_optional_list_tensor(tensors, index: int):
+    if tensors is None:
+        return None
+    selected_index = normalize_index(index, len(tensors))
     if selected_index is None:
-        if none_when_missing:
-            empty_image, empty_mask = empty_comfy_tensors()
-            return empty_image, empty_mask, False
-        raise ValueError(
-            f"Index out of range: index={index}, valid range is [0, {len(images) - 1}] or negative equivalent."
-        )
-
-    return validate_selected(images[selected_index], masks[selected_index], none_when_missing)
+        return None
+    return tensors[selected_index]
 
 
-def validate_selected(selected_image, selected_mask, none_when_missing: bool):
-    if selected_image.ndim != 4 or selected_mask.ndim != 3:
-        raise ValueError("Invalid selected tensor shape for `image` or `mask`.")
+def resolve_selected(selected_image, selected_mask, image_missing: str, mask_missing: str):
+    if selected_image is not None and selected_image.ndim != 4:
+        raise ValueError("Invalid selected tensor shape for `image`.")
+    if selected_mask is not None and selected_mask.ndim != 3:
+        raise ValueError("Invalid selected tensor shape for `mask`.")
 
-    has_image = not is_placeholder(selected_image, selected_mask)
-    if not has_image and not none_when_missing:
-        raise ValueError("Selected image is empty placeholder while `none_when_missing` is False.")
+    image_is_placeholder = selected_image is not None and is_placeholder_image(selected_image)
+    mask_is_placeholder = selected_mask is not None and is_placeholder_mask(selected_mask)
+    has_image = selected_image is not None and not image_is_placeholder
+
+    if image_is_placeholder:
+        selected_image = None
+    if mask_is_placeholder:
+        selected_mask = None
+
+    selected_image = resolve_missing_image(selected_image, selected_mask, image_missing)
+    selected_mask = resolve_missing_mask(selected_mask, selected_image, mask_missing)
 
     return selected_image, selected_mask, has_image
+
+
+def resolve_missing_image(selected_image, selected_mask, policy: str):
+    if selected_image is not None:
+        return selected_image
+    if policy == "None":
+        return None
+    if policy == "Throw error":
+        raise ValueError("Selected image is missing.")
+    if selected_mask is not None:
+        return empty_image_like(selected_mask)
+    empty_image, _ = empty_comfy_tensors()
+    return empty_image
+
+
+def resolve_missing_mask(selected_mask, selected_image, policy: str):
+    if selected_mask is not None:
+        return selected_mask
+    if policy == "None":
+        return None
+    if policy == "Throw error":
+        raise ValueError("Selected mask is missing.")
+    if selected_image is not None:
+        return empty_mask_like(selected_image)
+    _, empty_mask = empty_comfy_tensors()
+    return empty_mask

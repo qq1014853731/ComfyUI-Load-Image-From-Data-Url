@@ -33,7 +33,5 @@ def collect_uri_list(kwargs) -> list[str]:
         uri = kwargs[key]
         if not isinstance(uri, str):
             continue
-        uri = uri.strip()
-        if uri:
-            uri_list.append(uri)
+        uri_list.append(uri.strip())
     return uri_list

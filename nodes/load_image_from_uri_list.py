@@ -1,4 +1,5 @@
 from .shared.dynamic_inputs import ContainsAnyDict, collect_uri_list
+from .shared.missing import MISSING_POLICIES, validate_missing_policy
 from .shared.tensors import empty_comfy_tensors
 from .utils import load_uri_to_tensors
 
@@ -13,7 +14,7 @@ class LoadImageFromURIList:
                     "INT",
                     {"default": 0, "min": 0, "max": 2147483647, "step": 1048576},
                 ),
-                "allow_empty": ("BOOLEAN", {"default": False}),
+                "uri_missing": (list(MISSING_POLICIES), {"default": "None"}),
             },
             # uri_1, uri_2, ... are created by the frontend extension at runtime.
             "optional": ContainsAnyDict(),
@@ -29,20 +30,31 @@ class LoadImageFromURIList:
         self,
         timeout: int = 0,
         max_download_bytes: int = 0,
-        allow_empty: bool = False,
+        uri_missing: str = "None",
         **kwargs,
     ):
+        validate_missing_policy(uri_missing, "uri_missing")
         uri_list = collect_uri_list(kwargs)
 
         if not uri_list:
-            if allow_empty:
-                image_tensor, mask_tensor = empty_comfy_tensors()
-                return [image_tensor], [mask_tensor], False, 0
-            raise ValueError("URI list is empty. Add at least one non-empty URI item.")
+            return [], [], False, 0
 
         image_tensors = []
         mask_tensors = []
+        real_image_count = 0
         for uri in uri_list:
+            if not uri:
+                if uri_missing == "None":
+                    image_tensors.append(None)
+                    mask_tensors.append(None)
+                    continue
+                if uri_missing == "Throw error":
+                    raise ValueError("URI list contains an empty URI item.")
+                image_tensor, mask_tensor = empty_comfy_tensors()
+                image_tensors.append(image_tensor)
+                mask_tensors.append(mask_tensor)
+                continue
+
             image_tensor, mask_tensor = load_uri_to_tensors(
                 uri,
                 timeout=timeout,
@@ -50,5 +62,6 @@ class LoadImageFromURIList:
             )
             image_tensors.append(image_tensor)
             mask_tensors.append(mask_tensor)
+            real_image_count += 1
 
-        return image_tensors, mask_tensors, True, len(uri_list)
+        return image_tensors, mask_tensors, real_image_count > 0, len(uri_list)

@@ -24,12 +24,18 @@ def empty_image_like(mask_tensor: torch.Tensor) -> torch.Tensor:
 
 
 def is_placeholder(image_tensor: torch.Tensor, mask_tensor: torch.Tensor) -> bool:
+    return is_placeholder_image(image_tensor) and is_placeholder_mask(mask_tensor)
+
+
+def is_placeholder_image(image_tensor: torch.Tensor) -> bool:
     return (
         tuple(image_tensor.shape) == (1, 1, 1, 3)
-        and tuple(mask_tensor.shape) == (1, 1, 1)
         and bool(torch.all(image_tensor == 0).item())
-        and bool(torch.all(mask_tensor == 1).item())
     )
+
+
+def is_placeholder_mask(mask_tensor: torch.Tensor) -> bool:
+    return tuple(mask_tensor.shape) == (1, 1, 1) and bool(torch.all(mask_tensor == 1).item())
 
 
 def resize_comfy_tensors(image_tensor: torch.Tensor, mask_tensor: torch.Tensor, height: int, width: int):
