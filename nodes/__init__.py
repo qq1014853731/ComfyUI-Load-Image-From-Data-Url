@@ -1,9 +1,13 @@
-from .batch_load_image_selector_node import BatchLoadImageSelector
-from .load_image_from_uri_batch_node import LoadImageFromURIBatch
-from .load_image_from_uri_node import LoadImageFromURI
+from .load_image_from_uri import LoadImageFromURI
+from .load_image_from_uri_batch import LoadImageFromURIBatch
+from .load_image_from_uri_list import LoadImageFromURIList
+from .load_image_selector_batch import LoadImageSelectorBatch
+from .load_image_selector_list import LoadImageSelectorList
 
 __all__ = [
     "LoadImageFromURI",
     "LoadImageFromURIBatch",
-    "BatchLoadImageSelector",
+    "LoadImageFromURIList",
+    "LoadImageSelectorBatch",
+    "LoadImageSelectorList",
 ]

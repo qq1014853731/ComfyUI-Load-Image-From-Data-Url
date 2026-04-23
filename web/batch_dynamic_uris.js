@@ -1,11 +1,31 @@
 import { app } from "../../scripts/app.js";
+import { openUriEditor } from "./load-image-from-uri_editor.js";
 
-const NODE_CLASS = "LoadImageFromURIBatch";
+const NODE_CLASSES = new Set(["LoadImageFromURIBatch", "LoadImageFromURIList"]);
 const URI_NAME_PATTERN = /^uri_(\d+)$/;
-const CONTROL_WIDGET_NAMES = new Set(["add_uri", "remove_uri"]);
+const CONTROL_WIDGET_NAMES = new Set(["add_uri"]);
+const DEBUG_PREFIX = "[LoadImageFromURI dynamic uris]";
+
+// LiteGraph custom widgets must report a height from computeSize. This matches
+// ComfyUI's default widget row height and keeps the custom controls aligned with
+// built-in widgets.
+const DEFAULT_WIDGET_HEIGHT = 20;
+
+const REMOVE_BUTTON_WIDTH = 104;
+const URI_FIELD_MIN_WIDTH = 80;
+const URI_ROW_GAP = 6;
+
+const WIDGET_BACKGROUND = "#1f1f1f";
+const WIDGET_BORDER = "#666";
+const WIDGET_TEXT = "#ddd";
+const WIDGET_MUTED_TEXT = "#aaa";
 
 function isUriWidget(widget) {
   return widget?.name && URI_NAME_PATTERN.test(widget.name);
+}
+
+function isDynamicWidget(widget) {
+  return isUriWidget(widget) || CONTROL_WIDGET_NAMES.has(widget?.name);
 }
 
 function getUriWidgets(node) {
@@ -13,46 +33,292 @@ function getUriWidgets(node) {
 }
 
 function nextUriIndex(node) {
-  let maxIndex = 0;
-  // Use a monotonically increasing suffix so removing uri_2 does not rename
-  // existing widgets and break serialized workflow values.
-  for (const widget of getUriWidgets(node)) {
-    const match = widget.name.match(URI_NAME_PATTERN);
-    maxIndex = Math.max(maxIndex, Number(match[1]));
-  }
-  return maxIndex + 1;
+  return getUriWidgets(node).length + 1;
 }
 
-function moveWidgetBeforeControls(node, widget) {
+function moveWidgetBeforeAddButton(node, widget) {
   const widgets = node.widgets || [];
   const widgetIndex = widgets.indexOf(widget);
-  const firstControlIndex = widgets.findIndex((item) => CONTROL_WIDGET_NAMES.has(item.name));
-  // Keep URI fields above the add/remove buttons.
-  if (widgetIndex === -1 || firstControlIndex === -1 || widgetIndex < firstControlIndex) {
+  const addButtonIndex = widgets.findIndex((item) => item.name === "add_uri");
+  if (widgetIndex === -1 || addButtonIndex === -1 || widgetIndex < addButtonIndex) {
     return;
   }
+
   widgets.splice(widgetIndex, 1);
-  widgets.splice(firstControlIndex, 0, widget);
+  widgets.splice(addButtonIndex, 0, widget);
+}
+
+function renumberUriWidgets(node) {
+  let uriIndex = 1;
+
+  // Keep backend kwargs continuous and ordered: uri_1, uri_2, uri_3, ...
+  for (const widget of node.widgets || []) {
+    if (isUriWidget(widget)) {
+      widget.name = `uri_${uriIndex}`;
+      uriIndex += 1;
+    }
+  }
+}
+
+function makeUriWidget(node, name, value = "") {
+  return {
+    name,
+    type: "uri_row",
+    value,
+    serialize: true,
+    options: {},
+
+    computeSize(width) {
+      return [width, DEFAULT_WIDGET_HEIGHT];
+    },
+
+    draw(ctx, nodeArg, width, y, height) {
+      const rowHeight = height || DEFAULT_WIDGET_HEIGHT;
+      const widgetY = y + 1;
+      const widgetHeight = Math.max(1, rowHeight - 2);
+      const rightX = nodeArg.size[0] - 15;
+      const buttonX = rightX - REMOVE_BUTTON_WIDTH;
+      const fieldWidth = Math.max(URI_FIELD_MIN_WIDTH, buttonX - URI_ROW_GAP - 15);
+
+      this._hitAreas = {
+        field: {
+          nodeX: 15,
+          localX: 0,
+          width: fieldWidth,
+        },
+        remove: {
+          nodeX: buttonX,
+          localX: buttonX - 15,
+          width: REMOVE_BUTTON_WIDTH,
+        },
+      };
+
+      ctx.save();
+      ctx.textBaseline = "middle";
+      ctx.font = "14px sans-serif";
+      ctx.lineWidth = 1;
+
+      ctx.strokeStyle = WIDGET_BORDER;
+      ctx.fillStyle = WIDGET_BACKGROUND;
+      drawPill(ctx, 15, widgetY, fieldWidth, widgetHeight);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = WIDGET_MUTED_TEXT;
+      ctx.textAlign = "left";
+      ctx.fillText(this.name, 15 + 10, y + rowHeight / 2);
+
+      ctx.fillStyle = WIDGET_TEXT;
+      ctx.textAlign = "right";
+      ctx.fillText(
+        shortenValue(ctx, this.value, fieldWidth - 92),
+        15 + fieldWidth - 10,
+        y + rowHeight / 2
+      );
+
+      ctx.strokeStyle = WIDGET_BORDER;
+      ctx.fillStyle = WIDGET_BACKGROUND;
+      drawPill(ctx, buttonX, widgetY, REMOVE_BUTTON_WIDTH, widgetHeight);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = WIDGET_TEXT;
+      ctx.textAlign = "center";
+      ctx.fillText("Remove", buttonX + REMOVE_BUTTON_WIDTH / 2, y + rowHeight / 2);
+      ctx.restore();
+    },
+
+    mouse(event, pos, nodeArg) {
+      if (event.type !== "pointerdown" && event.type !== "mousedown") {
+        return false;
+      }
+
+      const localXValues = getPossibleLocalXValues(event, pos, nodeArg);
+      const removeHit = isInsideHitArea(localXValues, this._hitAreas?.remove);
+      const fieldHit = isInsideHitArea(localXValues, this._hitAreas?.field);
+
+      event.preventDefault?.();
+      event.stopPropagation?.();
+
+      if (removeHit) {
+        removeUriWidget(nodeArg, this);
+        return true;
+      }
+
+      if (fieldHit) {
+        openUriEditor(this, nodeArg);
+      }
+      return true;
+    },
+
+    onMouseDown(event, pos, nodeArg) {
+      return this.mouse(event, pos, nodeArg);
+    },
+
+    onClick(event, pos, nodeArg) {
+      return this.mouse(event, pos, nodeArg);
+    },
+  };
+}
+
+function makeAddUriWidget(node) {
+  return {
+    name: "add_uri",
+    type: "add_uri_button",
+    value: "add_uri",
+    serialize: false,
+    options: {},
+
+    computeSize(width) {
+      return [width, DEFAULT_WIDGET_HEIGHT];
+    },
+
+    draw(ctx, nodeArg, width, y, height) {
+      const rowHeight = height || DEFAULT_WIDGET_HEIGHT;
+      const widgetY = y + 1;
+      const widgetHeight = Math.max(1, rowHeight - 2);
+      const widgetWidth = Math.max(1, nodeArg.size[0] - 30);
+
+      ctx.save();
+      ctx.textBaseline = "middle";
+      ctx.font = "14px sans-serif";
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = WIDGET_BORDER;
+      ctx.fillStyle = WIDGET_BACKGROUND;
+      drawPill(ctx, 15, widgetY, widgetWidth, widgetHeight);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = WIDGET_TEXT;
+      ctx.textAlign = "center";
+      ctx.fillText(this.value, 15 + widgetWidth / 2, y + rowHeight / 2);
+      ctx.restore();
+    },
+
+    mouse(event, pos, nodeArg) {
+      if (event.type !== "pointerdown" && event.type !== "mousedown") {
+        return false;
+      }
+
+      event.preventDefault?.();
+      event.stopPropagation?.();
+      addUriWidget(nodeArg);
+      return true;
+    },
+
+    onMouseDown(event, pos, nodeArg) {
+      return this.mouse(event, pos, nodeArg);
+    },
+
+    onClick(event, pos, nodeArg) {
+      return this.mouse(event, pos, nodeArg);
+    },
+  };
+}
+
+function getPossibleLocalXValues(event, pos, node) {
+  const values = [];
+
+  if (Array.isArray(pos) && Number.isFinite(pos[0])) {
+    values.push(pos[0]);
+    values.push(pos[0] - 15);
+  }
+
+  if (Number.isFinite(event?.canvasX)) {
+    values.push(event.canvasX - node.pos[0]);
+    values.push(event.canvasX - node.pos[0] - 15);
+  }
+
+  if (Number.isFinite(event?.clientX) && app.canvas?.canvas) {
+    const rect = app.canvas.canvas.getBoundingClientRect();
+    const canvasX = (event.clientX - rect.left) / app.canvas.ds.scale - app.canvas.ds.offset[0];
+    values.push(canvasX - node.pos[0]);
+    values.push(canvasX - node.pos[0] - 15);
+  }
+
+  return values;
+}
+
+function isInsideHitArea(xValues, hitArea) {
+  if (!hitArea) {
+    return false;
+  }
+
+  for (const x of xValues) {
+    if (x >= hitArea.nodeX && x <= hitArea.nodeX + hitArea.width) {
+      return true;
+    }
+    if (x >= hitArea.localX && x <= hitArea.localX + hitArea.width) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function shortenValue(ctx, value, maxWidth) {
+  const text = String(value ?? "");
+  if (!text || ctx.measureText(text).width <= maxWidth) {
+    return text;
+  }
+
+  const ellipsis = "...";
+  let start = 0;
+  let end = text.length;
+  while (start < end) {
+    const mid = Math.ceil((start + end) / 2);
+    const candidate = ellipsis + text.slice(text.length - mid);
+    if (ctx.measureText(candidate).width <= maxWidth) {
+      start = mid;
+    } else {
+      end = mid - 1;
+    }
+  }
+  return ellipsis + text.slice(text.length - start);
+}
+
+function drawPill(ctx, x, y, width, height) {
+  drawRoundedRect(ctx, x, y, width, height, height / 2);
+}
+
+function drawRoundedRect(ctx, x, y, width, height, radius) {
+  if (ctx.roundRect) {
+    ctx.beginPath();
+    ctx.roundRect(x, y, width, height, radius);
+    return;
+  }
+
+  const right = x + width;
+  const bottom = y + height;
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(right - radius, y);
+  ctx.quadraticCurveTo(right, y, right, y + radius);
+  ctx.lineTo(right, bottom - radius);
+  ctx.quadraticCurveTo(right, bottom, right - radius, bottom);
+  ctx.lineTo(x + radius, bottom);
+  ctx.quadraticCurveTo(x, bottom, x, bottom - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
 }
 
 function addUriWidget(node, value = "") {
-  // The widget name becomes the backend kwarg name: uri_1, uri_2, ...
-  const widget = node.addWidget("text", `uri_${nextUriIndex(node)}`, value, () => {}, {
-    multiline: true,
-  });
-  widget.serialize = true;
-  moveWidgetBeforeControls(node, widget);
+  const widget = makeUriWidget(node, `uri_${nextUriIndex(node)}`, value);
+  node.addCustomWidget(widget);
+  moveWidgetBeforeAddButton(node, widget);
+  renumberUriWidgets(node);
   resizeNode(node);
   return widget;
 }
 
-function removeLastUriWidget(node) {
-  const widgets = getUriWidgets(node);
-  const widget = widgets[widgets.length - 1];
-  if (!widget) {
+function removeUriWidget(node, uriWidget) {
+  const widgets = node.widgets || [];
+  const uriIndex = widgets.indexOf(uriWidget);
+  if (uriIndex === -1) {
     return;
   }
-  node.widgets.splice(node.widgets.indexOf(widget), 1);
+
+  widgets.splice(uriIndex, 1);
+  renumberUriWidgets(node);
   resizeNode(node);
 }
 
@@ -65,15 +331,7 @@ function resizeNode(node) {
 
 function ensureControls(node) {
   if (!node.widgets?.some((widget) => widget.name === "add_uri")) {
-    const addButton = node.addWidget("button", "add_uri", "+ Add URI", () => addUriWidget(node));
-    addButton.serialize = false;
-  }
-
-  if (!node.widgets?.some((widget) => widget.name === "remove_uri")) {
-    const removeButton = node.addWidget("button", "remove_uri", "Remove Last URI", () => {
-      removeLastUriWidget(node);
-    });
-    removeButton.serialize = false;
+    node.addCustomWidget(makeAddUriWidget(node));
   }
 }
 
@@ -83,23 +341,25 @@ function ensureDefaultUriWidget(node) {
   }
 }
 
-function extractSerializedUriValues(info) {
+function extractSerializedUriValues(info, nodeData) {
   const values = info?.widgets_values;
   if (!Array.isArray(values)) {
     return [];
   }
 
   // Base widgets from Python are serialized first:
-  // timeout, max_download_bytes, allow_empty.
+  // Batch: timeout, max_download_bytes, size_mode, uri_missing.
+  // List: timeout, max_download_bytes, uri_missing.
   // URI widgets are added by this extension after those base widgets.
-  return values.slice(3).filter((value) => typeof value === "string");
+  const baseWidgetCount = nodeData.name === "LoadImageFromURIBatch" ? 4 : 3;
+  return values.slice(baseWidgetCount).filter((value) => typeof value === "string");
 }
 
 app.registerExtension({
   name: "ComfyUI.LoadImageFromURI.BatchDynamicURIs",
 
   async beforeRegisterNodeDef(nodeType, nodeData) {
-    if (nodeData.name !== NODE_CLASS) {
+    if (!NODE_CLASSES.has(nodeData.name)) {
       return;
     }
 
@@ -114,16 +374,13 @@ app.registerExtension({
 
     const originalConfigure = nodeType.prototype.configure;
     nodeType.prototype.configure = function (info) {
-      const uriValues = extractSerializedUriValues(info);
+      const uriValues = extractSerializedUriValues(info, nodeData);
       originalConfigure?.apply(this, arguments);
       this.serialize_widgets = true;
 
       // Rebuild dynamic widgets after ComfyUI restores Python-defined widgets.
-      for (const widget of [...getUriWidgets(this)]) {
-        this.widgets.splice(this.widgets.indexOf(widget), 1);
-      }
       for (const widget of [...(this.widgets || [])]) {
-        if (CONTROL_WIDGET_NAMES.has(widget.name)) {
+        if (isDynamicWidget(widget)) {
           this.widgets.splice(this.widgets.indexOf(widget), 1);
         }
       }
@@ -133,8 +390,6 @@ app.registerExtension({
         for (const value of uriValues) {
           addUriWidget(this, value);
         }
-      } else {
-        ensureDefaultUriWidget(this);
       }
       resizeNode(this);
     };
