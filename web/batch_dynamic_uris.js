@@ -6,6 +6,7 @@ const REMOVE_NAME_PATTERN = /^remove_uri_(\d+)$/;
 const CONTROL_WIDGET_NAMES = new Set(["add_uri", "remove_uri"]);
 const REMOVE_BUTTON_WIDTH = 76;
 const REMOVE_BUTTON_GAP = 8;
+const ROW_HEIGHT = 32;
 
 function isUriWidget(widget) {
   return widget?.name && URI_NAME_PATTERN.test(widget.name);
@@ -52,44 +53,96 @@ function renumberUriWidgets(node) {
   }
 }
 
-function decorateUriWidget(node, widget) {
-  const originalDraw = widget.draw;
-  const originalMouse = widget.mouse;
+function makeUriWidget(node, name, value = "") {
+  return {
+    name,
+    type: "text",
+    value,
+    serialize: true,
 
-  widget.draw = function (ctx, nodeArg, width, y, height) {
-    const textWidth = Math.max(80, width - REMOVE_BUTTON_WIDTH - REMOVE_BUTTON_GAP);
-    originalDraw?.call(this, ctx, nodeArg, textWidth, y, height);
+    computeSize(width) {
+      return [width, ROW_HEIGHT];
+    },
 
-    const buttonX = nodeArg.size[0] - REMOVE_BUTTON_WIDTH - 15;
-    const buttonY = y;
-    ctx.save();
-    ctx.strokeStyle = "#777";
-    ctx.fillStyle = "#222";
-    ctx.lineWidth = 1;
-    drawRoundedRect(ctx, buttonX, buttonY + 2, REMOVE_BUTTON_WIDTH, height - 4, 8);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#ddd";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = "14px sans-serif";
-    ctx.fillText("Remove", buttonX + REMOVE_BUTTON_WIDTH / 2, buttonY + height / 2);
-    ctx.restore();
-  };
+    draw(ctx, nodeArg, width, y, height) {
+      const rowHeight = Math.max(ROW_HEIGHT, height || ROW_HEIGHT);
+      const leftX = 15;
+      const rightX = nodeArg.size[0] - 15;
+      const buttonX = rightX - REMOVE_BUTTON_WIDTH;
+      const fieldWidth = Math.max(80, buttonX - REMOVE_BUTTON_GAP - leftX);
 
-  widget.mouse = function (event, pos, nodeArg) {
-    const buttonX = nodeArg.size[0] - REMOVE_BUTTON_WIDTH - 15;
-    const insideRemoveButton = pos[0] >= buttonX && pos[0] <= buttonX + REMOVE_BUTTON_WIDTH;
+      ctx.save();
 
-    if (insideRemoveButton && (event.type === "pointerdown" || event.type === "mousedown")) {
-      removeUriWidget(nodeArg, widget);
+      ctx.strokeStyle = "#777";
+      ctx.fillStyle = "#222";
+      ctx.lineWidth = 1;
+      drawRoundedRect(ctx, leftX, y + 2, fieldWidth, rowHeight - 4, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "#aaa";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.font = "14px sans-serif";
+      ctx.fillText(this.name, leftX + 10, y + rowHeight / 2);
+
+      ctx.fillStyle = "#eee";
+      ctx.textAlign = "right";
+      ctx.fillText(shortenValue(ctx, this.value, fieldWidth - 90), leftX + fieldWidth - 10, y + rowHeight / 2);
+
+      ctx.strokeStyle = "#777";
+      ctx.fillStyle = "#222";
+      drawRoundedRect(ctx, buttonX, y + 2, REMOVE_BUTTON_WIDTH, rowHeight - 4, 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#ddd";
+      ctx.textAlign = "center";
+      ctx.fillText("Remove", buttonX + REMOVE_BUTTON_WIDTH / 2, y + rowHeight / 2);
+
+      ctx.restore();
+    },
+
+    mouse(event, pos, nodeArg) {
+      if (event.type !== "pointerdown" && event.type !== "mousedown") {
+        return false;
+      }
+
+      const buttonX = nodeArg.size[0] - REMOVE_BUTTON_WIDTH - 15;
+      const insideRemoveButton = pos[0] >= buttonX && pos[0] <= buttonX + REMOVE_BUTTON_WIDTH;
+      if (insideRemoveButton) {
+        removeUriWidget(nodeArg, this);
+        return true;
+      }
+
+      const nextValue = window.prompt(`Edit ${this.name}`, this.value ?? "");
+      if (nextValue !== null) {
+        this.value = nextValue;
+        nodeArg.setDirtyCanvas(true, true);
+      }
       return true;
-    }
-
-    return originalMouse?.call(this, event, pos, nodeArg);
+    },
   };
+}
 
-  return widget;
+function shortenValue(ctx, value, maxWidth) {
+  const text = String(value ?? "");
+  if (!text || ctx.measureText(text).width <= maxWidth) {
+    return text;
+  }
+
+  const ellipsis = "...";
+  let start = 0;
+  let end = text.length;
+  while (start < end) {
+    const mid = Math.ceil((start + end) / 2);
+    const candidate = ellipsis + text.slice(text.length - mid);
+    if (ctx.measureText(candidate).width <= maxWidth) {
+      start = mid;
+    } else {
+      end = mid - 1;
+    }
+  }
+  return ellipsis + text.slice(text.length - start);
 }
 
 function drawRoundedRect(ctx, x, y, width, height, radius) {
@@ -115,11 +168,8 @@ function drawRoundedRect(ctx, x, y, width, height, radius) {
 
 function addUriWidget(node, value = "") {
   // The widget name becomes the backend kwarg name: uri_1, uri_2, ...
-  const widget = node.addWidget("text", `uri_${nextUriIndex(node)}`, value, () => {}, {
-    multiline: true,
-  });
-  widget.serialize = true;
-  decorateUriWidget(node, widget);
+  const widget = makeUriWidget(node, `uri_${nextUriIndex(node)}`, value);
+  node.addCustomWidget(widget);
   moveWidgetBeforeAddButton(node, widget);
   renumberUriWidgets(node);
   resizeNode(node);
