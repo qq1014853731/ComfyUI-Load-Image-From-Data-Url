@@ -1,0 +1,53 @@
+.load-image-uri-editor-overlay {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: fixed;
+  z-index: 10000;
+}
+
+.load-image-uri-editor {
+  align-items: center;
+  background: #2f3030;
+  border: 1px solid #555;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  color: #ddd;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(360px, 56vw) auto;
+  padding: 8px 10px;
+}
+
+.load-image-uri-editor label {
+  color: #d8d8d8;
+  font: 20px sans-serif;
+}
+
+.load-image-uri-editor textarea {
+  background: #222;
+  border: 1px solid #555;
+  color: #dce9ff;
+  font: 20px monospace;
+  min-height: 32px;
+  outline: none;
+  padding: 4px 8px;
+  resize: vertical;
+}
+
+.load-image-uri-editor-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.load-image-uri-editor button {
+  background: #d0d0d0;
+  border: 0;
+  border-radius: 18px;
+  color: #555;
+  cursor: pointer;
+  font: 20px sans-serif;
+  min-width: 72px;
+  padding: 5px 14px;
+}

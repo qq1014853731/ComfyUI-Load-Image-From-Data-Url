@@ -1,4 +1,5 @@
 import { app } from "../../scripts/app.js";
+import { openUriEditor } from "./load-image-from-uri_editor.js";
 
 const NODE_CLASSES = new Set(["LoadImageFromURIBatch", "LoadImageFromURIList"]);
 const URI_NAME_PATTERN = /^uri_(\d+)$/;
@@ -155,129 +156,6 @@ function makeUriWidget(node, name, value = "") {
   };
 }
 
-function openUriEditor(widget, node) {
-  ensureUriEditorStyles();
-
-  const overlay = document.createElement("div");
-  overlay.className = "load-image-uri-editor-overlay";
-
-  const dialog = document.createElement("div");
-  dialog.className = "load-image-uri-editor";
-
-  const label = document.createElement("label");
-  label.textContent = "Value";
-
-  const input = document.createElement("textarea");
-  input.value = widget.value ?? "";
-  input.rows = 1;
-  input.spellcheck = false;
-
-  const okButton = document.createElement("button");
-  okButton.type = "button";
-  okButton.textContent = "OK";
-
-  const cancelButton = document.createElement("button");
-  cancelButton.type = "button";
-  cancelButton.textContent = "Cancel";
-
-  const buttonRow = document.createElement("div");
-  buttonRow.className = "load-image-uri-editor-buttons";
-  buttonRow.append(okButton, cancelButton);
-  dialog.append(label, input, buttonRow);
-  overlay.append(dialog);
-  document.body.append(overlay);
-
-  const close = (save) => {
-    if (save) {
-      widget.value = input.value;
-      node.setDirtyCanvas(true, true);
-    }
-    overlay.remove();
-  };
-
-  okButton.addEventListener("click", () => close(true));
-  cancelButton.addEventListener("click", () => close(false));
-  overlay.addEventListener("mousedown", (event) => {
-    if (event.target === overlay) {
-      close(false);
-    }
-  });
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      close(false);
-    } else if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-      event.preventDefault();
-      close(true);
-    }
-  });
-
-  requestAnimationFrame(() => {
-    input.focus();
-    input.select();
-  });
-}
-
-function ensureUriEditorStyles() {
-  if (document.getElementById("load-image-uri-editor-styles")) {
-    return;
-  }
-
-  const style = document.createElement("style");
-  style.id = "load-image-uri-editor-styles";
-  style.textContent = `
-.load-image-uri-editor-overlay {
-  align-items: center;
-  background: rgba(0, 0, 0, 0.35);
-  display: flex;
-  inset: 0;
-  justify-content: center;
-  position: fixed;
-  z-index: 10000;
-}
-.load-image-uri-editor {
-  align-items: center;
-  background: #2f3030;
-  border: 1px solid #555;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
-  color: #ddd;
-  display: grid;
-  gap: 10px;
-  grid-template-columns: auto minmax(360px, 56vw) auto;
-  padding: 8px 10px;
-}
-.load-image-uri-editor label {
-  color: #d8d8d8;
-  font: 20px sans-serif;
-}
-.load-image-uri-editor textarea {
-  background: #222;
-  border: 1px solid #555;
-  color: #dce9ff;
-  font: 20px monospace;
-  min-height: 32px;
-  outline: none;
-  padding: 4px 8px;
-  resize: vertical;
-}
-.load-image-uri-editor-buttons {
-  display: flex;
-  gap: 8px;
-}
-.load-image-uri-editor button {
-  background: #d0d0d0;
-  border: 0;
-  border-radius: 18px;
-  color: #555;
-  cursor: pointer;
-  font: 20px sans-serif;
-  min-width: 72px;
-  padding: 5px 14px;
-}
-`;
-  document.head.append(style);
-}
-
 function getPossibleLocalXValues(event, pos, node) {
   const values = [];
 
@@ -379,7 +257,6 @@ function removeUriWidget(node, uriWidget) {
 
   widgets.splice(uriIndex, 1);
   renumberUriWidgets(node);
-  ensureDefaultUriWidget(node);
   resizeNode(node);
 }
 
@@ -456,8 +333,6 @@ app.registerExtension({
         for (const value of uriValues) {
           addUriWidget(this, value);
         }
-      } else {
-        ensureDefaultUriWidget(this);
       }
       resizeNode(this);
     };
