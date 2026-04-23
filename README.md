@@ -13,6 +13,7 @@ The batch loader uses independent URI fields that can be added with a `+ Add URI
 - `Load Image From URI (List)` (`LoadImageFromURIList`)
 - `Load Image Selector (Batch)` (`LoadImageSelectorBatch`)
 - `Load Image Selector (List)` (`LoadImageSelectorList`)
+- `Lazy Gate (Any)` (`LazyGateAny`)
 
 ## Install
 
@@ -58,6 +59,7 @@ Use this node when you want to load **one image**.
   - `Throw error`: stop with an error
 
 Best for:
+
 - loading one remote image
 - loading one local image
 - loading one S3 image
@@ -75,6 +77,7 @@ Use this node when you want to load **multiple images as one batch tensor**.
   - `error`: stop when any image size differs
 
 Best for:
+
 - sending multiple images into nodes that support batch input
 - forcing a single batch tensor output
 
@@ -104,6 +107,7 @@ Use this node after `Load Image From URI (Batch)` when you want to pick **one im
 - Out-of-range `index` is treated as missing for both `image` and `mask`.
 
 Best for:
+
 - selecting one image from a loaded batch tensor
 - building optional or index-based workflows
 
@@ -113,7 +117,28 @@ Use this node after `Load Image From URI (List)` when you want to pick **one ima
 
 Inputs match `Load Image Selector (Batch)`, but this node consumes the full list at once and selects by list index.
 
+### Lazy Gate (Any)
+
+Use this node when you want to conditionally bypass an upstream branch and output `None` without forcing that branch to execute.
+
+- `enabled`:
+  - `true`: request the lazy input `value` and pass it through
+  - `false`: do not request `value`; output `None` directly
+- `value`:
+  - accepts any ComfyUI type (`*`)
+  - marked as lazy input, so it is only evaluated when `enabled = true`
+
+Best for:
+
+- skipping nodes that do not accept `None`
+- forwarding `None` to downstream nodes that can accept optional inputs
+- building conditional branches where disabled paths should not execute
+
 ## Simple Examples
+
+### Lazy Gate workflow example
+
+Lazy Gate workflow example
 
 ### Single image
 

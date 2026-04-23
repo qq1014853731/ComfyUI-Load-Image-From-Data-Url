@@ -21,7 +21,7 @@ class LoadImageFromURI:
     RETURN_TYPES = ("IMAGE", "MASK", "BOOLEAN")
     RETURN_NAMES = ("image", "mask", "has_image")
     FUNCTION = "load_image_from_uri"
-    CATEGORY = "image"
+    CATEGORY = "lifu/image"
 
     def load_image_from_uri(
         self,
