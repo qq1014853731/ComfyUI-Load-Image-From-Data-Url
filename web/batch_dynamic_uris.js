@@ -5,11 +5,14 @@ const NODE_CLASSES = new Set(["LoadImageFromURIBatch", "LoadImageFromURIList"]);
 const URI_NAME_PATTERN = /^uri_(\d+)$/;
 const CONTROL_WIDGET_NAMES = new Set(["add_uri"]);
 const DEBUG_PREFIX = "[LoadImageFromURI dynamic uris]";
-const REMOVE_BUTTON_WIDTH = 76;
-const REMOVE_BUTTON_GAP = 8;
-const ROW_HEIGHT = 32;
+const REMOVE_BUTTON_WIDTH = 96;
+const REMOVE_BUTTON_GAP = 6;
+const ROW_HEIGHT = 20;
 const FIELD_LEFT = 15;
-const FIELD_RADIUS = 8;
+const WIDGET_BACKGROUND = "#1f1f1f";
+const WIDGET_BORDER = "#666";
+const WIDGET_TEXT = "#ddd";
+const WIDGET_MUTED_TEXT = "#aaa";
 
 console.log(DEBUG_PREFIX, "extension module loaded");
 
@@ -68,7 +71,10 @@ function makeUriWidget(node, name, value = "") {
     },
 
     draw(ctx, nodeArg, width, y, height) {
-      const rowHeight = Math.max(ROW_HEIGHT, height || ROW_HEIGHT);
+      const rowHeight = height || ROW_HEIGHT;
+      const widgetY = y + 1;
+      const widgetHeight = Math.max(1, rowHeight - 2);
+      const widgetRadius = widgetHeight / 2;
       const rightX = nodeArg.size[0] - FIELD_LEFT;
       const buttonX = rightX - REMOVE_BUTTON_WIDTH;
       const fieldWidth = Math.max(80, buttonX - REMOVE_BUTTON_GAP - FIELD_LEFT);
@@ -91,27 +97,27 @@ function makeUriWidget(node, name, value = "") {
       ctx.font = "14px sans-serif";
       ctx.lineWidth = 1;
 
-      ctx.strokeStyle = "#777";
-      ctx.fillStyle = "#222";
-      drawRoundedRect(ctx, FIELD_LEFT, y + 2, fieldWidth, rowHeight - 4, FIELD_RADIUS);
+      ctx.strokeStyle = WIDGET_BORDER;
+      ctx.fillStyle = WIDGET_BACKGROUND;
+      drawRoundedRect(ctx, FIELD_LEFT, widgetY, fieldWidth, widgetHeight, widgetRadius);
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = "#aaa";
+      ctx.fillStyle = WIDGET_MUTED_TEXT;
       ctx.textAlign = "left";
       ctx.fillText(this.name, FIELD_LEFT + 10, y + rowHeight / 2);
 
-      ctx.fillStyle = "#eee";
+      ctx.fillStyle = WIDGET_TEXT;
       ctx.textAlign = "right";
       ctx.fillText(shortenValue(ctx, this.value, fieldWidth - 92), FIELD_LEFT + fieldWidth - 10, y + rowHeight / 2);
 
-      ctx.strokeStyle = "#777";
-      ctx.fillStyle = "#222";
-      drawRoundedRect(ctx, buttonX, y + 2, REMOVE_BUTTON_WIDTH, rowHeight - 4, FIELD_RADIUS);
+      ctx.strokeStyle = WIDGET_BORDER;
+      ctx.fillStyle = WIDGET_BACKGROUND;
+      drawRoundedRect(ctx, buttonX, widgetY, REMOVE_BUTTON_WIDTH, widgetHeight, widgetRadius);
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = "#ddd";
+      ctx.fillStyle = WIDGET_TEXT;
       ctx.textAlign = "center";
       ctx.fillText("Remove", buttonX + REMOVE_BUTTON_WIDTH / 2, y + rowHeight / 2);
       ctx.restore();
@@ -270,7 +276,7 @@ function resizeNode(node) {
 function ensureControls(node) {
   if (!node.widgets?.some((widget) => widget.name === "add_uri")) {
     console.log(DEBUG_PREFIX, "ensureControls add button", { nodeType: node?.type });
-    const addButton = node.addWidget("button", "add_uri", "+ Add URI", () => addUriWidget(node));
+    const addButton = node.addWidget("button", "add_uri", "add_uri", () => addUriWidget(node));
     addButton.serialize = false;
   }
 }
