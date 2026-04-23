@@ -3,7 +3,7 @@ import torch
 from .utils import ImageNodeUtils
 
 
-class BatchLoadImageSelector(ImageNodeUtils):
+class LoadImageSelectorBatch(ImageNodeUtils):
     @classmethod
     def INPUT_TYPES(cls):
         return {

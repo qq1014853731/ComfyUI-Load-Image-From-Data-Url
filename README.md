@@ -11,7 +11,7 @@ The batch loader uses independent URI fields that can be added with a `+ Add URI
 - `Load Image From URI` (`LoadImageFromURI`)
 - `Load Image From URI (Batch)` (`LoadImageFromURIBatch`)
 - `Load Image From URI (List)` (`LoadImageFromURIList`)
-- `Batch Load Image Selector` (`BatchLoadImageSelector`)
+- `Load Image Selector (Batch)` (`LoadImageSelectorBatch`)
 - `Load Image Selector (List)` (`LoadImageSelectorList`)
 
 ## Install
@@ -82,7 +82,7 @@ Use this node when you want to load **multiple images while preserving each orig
 - Outputs a ComfyUI list of individual `IMAGE` / `MASK` tensors
 - Does not resize or pad images
 
-### Batch Load Image Selector
+### Load Image Selector (Batch)
 
 Use this node after `Load Image From URI (Batch)` when you want to pick **one image** from a batch tensor.
 
@@ -105,7 +105,7 @@ Best for:
 
 Use this node after `Load Image From URI (List)` when you want to pick **one image** from a ComfyUI image list while keeping the selected image's original resolution.
 
-Inputs match `Batch Load Image Selector`, but this node consumes the full list at once and selects by list index.
+Inputs match `Load Image Selector (Batch)`, but this node consumes the full list at once and selects by list index.
 
 ## Simple Examples
 

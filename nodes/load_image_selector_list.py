@@ -1,7 +1,7 @@
-from .batch_load_image_selector_node import BatchLoadImageSelector
+from .load_image_selector_batch import LoadImageSelectorBatch
 
 
-class LoadImageSelectorList(BatchLoadImageSelector):
+class LoadImageSelectorList(LoadImageSelectorBatch):
     @classmethod
     def INPUT_TYPES(cls):
         return {

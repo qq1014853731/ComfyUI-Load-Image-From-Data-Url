@@ -93,7 +93,18 @@ function makeUriWidget(node, name, value = "") {
       ctx.strokeStyle = "#777";
       ctx.fillStyle = "#222";
       drawRoundedRect(ctx, buttonX, y + 2, REMOVE_BUTTON_WIDTH, rowHeight - 4, 8);
-      this._removeBounds = { x: buttonX, width: REMOVE_BUTTON_WIDTH };
+      this._hitAreas = {
+        field: {
+          nodeX: leftX,
+          localX: 0,
+          width: fieldWidth,
+        },
+        remove: {
+          nodeX: buttonX,
+          localX: buttonX - leftX,
+          width: REMOVE_BUTTON_WIDTH,
+        },
+      };
       ctx.fill();
       ctx.stroke();
       ctx.fillStyle = "#ddd";
@@ -108,18 +119,20 @@ function makeUriWidget(node, name, value = "") {
         return false;
       }
 
-      const buttonX = this._removeBounds?.x ?? nodeArg.size[0] - REMOVE_BUTTON_WIDTH - 15;
-      const localButtonX = Math.max(0, buttonX - 15);
-      const broadButtonX = Math.max(0, nodeArg.size[0] - REMOVE_BUTTON_WIDTH - 40);
-      const insideRemoveButton =
-        (pos[0] >= buttonX && pos[0] <= buttonX + REMOVE_BUTTON_WIDTH) ||
-        (pos[0] >= localButtonX && pos[0] <= localButtonX + REMOVE_BUTTON_WIDTH) ||
-        (pos[0] >= broadButtonX && pos[0] <= nodeArg.size[0]);
-      if (insideRemoveButton) {
+      const localXValues = getPossibleLocalXValues(event, pos, nodeArg);
+      if (isInsideHitArea(localXValues, this._hitAreas?.remove)) {
+        event.preventDefault?.();
+        event.stopPropagation?.();
         removeUriWidget(nodeArg, this);
         return true;
       }
 
+      if (!isInsideHitArea(localXValues, this._hitAreas?.field)) {
+        return true;
+      }
+
+      event.preventDefault?.();
+      event.stopPropagation?.();
       const nextValue = window.prompt(`Edit ${this.name}`, this.value ?? "");
       if (nextValue !== null) {
         this.value = nextValue;
@@ -127,7 +140,54 @@ function makeUriWidget(node, name, value = "") {
       }
       return true;
     },
+
+    onMouseDown(event, pos, nodeArg) {
+      return this.mouse(event, pos, nodeArg);
+    },
+
+    onClick(event, pos, nodeArg) {
+      return this.mouse(event, pos, nodeArg);
+    },
   };
+}
+
+function getPossibleLocalXValues(event, pos, node) {
+  const values = [];
+
+  if (Array.isArray(pos) && Number.isFinite(pos[0])) {
+    values.push(pos[0]);
+    values.push(pos[0] - 15);
+  }
+
+  if (Number.isFinite(event?.canvasX)) {
+    values.push(event.canvasX - node.pos[0]);
+    values.push(event.canvasX - node.pos[0] - 15);
+  }
+
+  if (Number.isFinite(event?.clientX) && app.canvas?.canvas) {
+    const rect = app.canvas.canvas.getBoundingClientRect();
+    const canvasX = (event.clientX - rect.left) / app.canvas.ds.scale - app.canvas.ds.offset[0];
+    values.push(canvasX - node.pos[0]);
+    values.push(canvasX - node.pos[0] - 15);
+  }
+
+  return values;
+}
+
+function isInsideHitArea(xValues, hitArea) {
+  if (!hitArea) {
+    return false;
+  }
+
+  for (const x of xValues) {
+    if (x >= hitArea.nodeX && x <= hitArea.nodeX + hitArea.width) {
+      return true;
+    }
+    if (x >= hitArea.localX && x <= hitArea.localX + hitArea.width) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function shortenValue(ctx, value, maxWidth) {

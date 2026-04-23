@@ -1,4 +1,4 @@
-from .load_image_from_uri_batch_node import LoadImageFromURIBatch
+from .load_image_from_uri_batch import LoadImageFromURIBatch
 from .utils import ContainsAnyDict
 
 

@@ -1,8 +1,8 @@
 from .nodes import (
-    BatchLoadImageSelector,
     LoadImageFromURI,
     LoadImageFromURIBatch,
     LoadImageFromURIList,
+    LoadImageSelectorBatch,
     LoadImageSelectorList,
 )
 
@@ -13,7 +13,7 @@ NODE_CLASS_MAPPINGS = {
     "LoadImageFromURI": LoadImageFromURI,
     "LoadImageFromURIBatch": LoadImageFromURIBatch,
     "LoadImageFromURIList": LoadImageFromURIList,
-    "BatchLoadImageSelector": BatchLoadImageSelector,
+    "LoadImageSelectorBatch": LoadImageSelectorBatch,
     "LoadImageSelectorList": LoadImageSelectorList,
 }
 
@@ -21,7 +21,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "LoadImageFromURI": "Load Image From URI",
     "LoadImageFromURIBatch": "Load Image From URI (Batch)",
     "LoadImageFromURIList": "Load Image From URI (List)",
-    "BatchLoadImageSelector": "Batch Load Image Selector",
+    "LoadImageSelectorBatch": "Load Image Selector (Batch)",
     "LoadImageSelectorList": "Load Image Selector (List)",
 }
 
