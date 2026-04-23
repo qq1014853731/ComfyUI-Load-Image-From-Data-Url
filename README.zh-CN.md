@@ -63,7 +63,11 @@ pip install -r requirements.txt
 
 - 点击 `+ Add URI`，为每张图片添加一个独立 URI/路径输入框
 - 其他参数含义与单图节点相同
-- 同一批次内的图片建议保持相同尺寸
+- `output_mode`：
+  - `list_original`：输出 ComfyUI 列表，每张图片和 mask 都保持自己的原始分辨率
+  - `batch_pad_to_max`：输出一个 batch tensor，将较小图片和 mask 补边到最大宽高
+  - `batch_resize_to_first`：输出一个 batch tensor，将后续图片和 mask 缩放到第一张图片尺寸
+  - `batch_error`：任意图片尺寸不一致时直接报错
 
 适合：
 - 批量加载多张网络图片
@@ -75,6 +79,8 @@ pip install -r requirements.txt
 
 这个节点用于从批量图片中取出**其中一张**。
 
+它同时支持 `Load Image From URI (Batch)` 的 `list_original` 输出和真正的 batch tensor 输出。
+
 - `index`：要取第几张
   - `0` = 第一张
   - `1` = 第二张
@@ -82,9 +88,12 @@ pip install -r requirements.txt
 - `none_when_missing`：
   - `True`：索引越界时返回空结果
   - `False`：索引越界时直接报错
+- `image` 和 `mask` 都是可选输入，但至少需要连接其中一个。
+  - 只连接 image：Selector 会按选中图片尺寸创建全 0 mask
+  - 只连接 mask：Selector 会按选中 mask 尺寸创建黑色 image
 
 适合：
-- 从 batch 中选出一张图片继续处理
+- 从 batch 或图片列表中选出一张图片继续处理
 - 做按索引取图的工作流
 
 ## 简单示例

@@ -93,6 +93,7 @@ function makeUriWidget(node, name, value = "") {
       ctx.strokeStyle = "#777";
       ctx.fillStyle = "#222";
       drawRoundedRect(ctx, buttonX, y + 2, REMOVE_BUTTON_WIDTH, rowHeight - 4, 8);
+      this._removeBounds = { x: buttonX, width: REMOVE_BUTTON_WIDTH };
       ctx.fill();
       ctx.stroke();
       ctx.fillStyle = "#ddd";
@@ -107,8 +108,13 @@ function makeUriWidget(node, name, value = "") {
         return false;
       }
 
-      const buttonX = nodeArg.size[0] - REMOVE_BUTTON_WIDTH - 15;
-      const insideRemoveButton = pos[0] >= buttonX && pos[0] <= buttonX + REMOVE_BUTTON_WIDTH;
+      const buttonX = this._removeBounds?.x ?? nodeArg.size[0] - REMOVE_BUTTON_WIDTH - 15;
+      const localButtonX = Math.max(0, buttonX - 15);
+      const broadButtonX = Math.max(0, nodeArg.size[0] - REMOVE_BUTTON_WIDTH - 40);
+      const insideRemoveButton =
+        (pos[0] >= buttonX && pos[0] <= buttonX + REMOVE_BUTTON_WIDTH) ||
+        (pos[0] >= localButtonX && pos[0] <= localButtonX + REMOVE_BUTTON_WIDTH) ||
+        (pos[0] >= broadButtonX && pos[0] <= nodeArg.size[0]);
       if (insideRemoveButton) {
         removeUriWidget(nodeArg, this);
         return true;
@@ -217,9 +223,10 @@ function extractSerializedUriValues(info) {
   }
 
   // Base widgets from Python are serialized first:
-  // timeout, max_download_bytes, allow_empty.
+  // timeout, max_download_bytes, output_mode, allow_empty.
   // URI widgets are added by this extension after those base widgets.
-  return values.slice(3).filter((value) => typeof value === "string");
+  const outputModes = new Set(["list_original", "batch_pad_to_max", "batch_resize_to_first", "batch_error"]);
+  return values.slice(outputModes.has(values[2]) ? 4 : 3).filter((value) => typeof value === "string");
 }
 
 app.registerExtension({

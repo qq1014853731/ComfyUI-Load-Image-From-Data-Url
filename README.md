@@ -63,7 +63,11 @@ Use this node when you want to load **multiple images at once**.
 
 - Click `+ Add URI` to add one independent URI/path field per image
 - Other parameters are the same as the single-image node
-- All images in the same batch should use the same size
+- `output_mode`:
+  - `list_original`: output a ComfyUI list of individual images/masks and preserve each original resolution
+  - `batch_pad_to_max`: output one batch tensor by padding smaller images/masks to the largest width and height
+  - `batch_resize_to_first`: output one batch tensor by resizing later images/masks to the first image size
+  - `batch_error`: stop when any image size differs
 
 Best for:
 - loading a list of images from URLs
@@ -75,6 +79,8 @@ Best for:
 
 Use this node after the batch loader when you want to pick **one image** from the batch.
 
+It supports both `list_original` output and real batch tensor output from `Load Image From URI (Batch)`.
+
 - `index`: which image to pick
   - `0` = first image
   - `1` = second image
@@ -82,9 +88,12 @@ Use this node after the batch loader when you want to pick **one image** from th
 - `none_when_missing`:
   - `True`: if index is out of range, return an empty result
   - `False`: if index is out of range, stop with an error
+- `image` and `mask` are optional, but at least one must be connected.
+  - image only: selector creates a zero mask with the selected image size
+  - mask only: selector creates a black image with the selected mask size
 
 Best for:
-- selecting one image from a loaded batch
+- selecting one image from a loaded batch or image list
 - building optional or index-based workflows
 
 ## Simple Examples
