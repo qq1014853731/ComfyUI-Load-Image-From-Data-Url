@@ -14,6 +14,7 @@ The batch loader uses independent URI fields that can be added with a `+ Add URI
 - `Load Image Selector (Batch)` (`LoadImageSelectorBatch`)
 - `Load Image Selector (List)` (`LoadImageSelectorList`)
 - `Lazy Gate (Any)` (`LazyGateAny`)
+- `Preview Image (With None)` (`PreviewImageWithNone`)
 
 ## Install
 
@@ -133,6 +134,18 @@ Best for:
 - skipping nodes that do not accept `None`
 - forwarding `None` to downstream nodes that can accept optional inputs
 - building conditional branches where disabled paths should not execute
+
+### Preview Image (With None)
+
+Use this node like ComfyUI's preview node, but it safely accepts `None`.
+
+- Input `image` is optional.
+- When `image` is `None`, this node does nothing and does not raise an error.
+- When `image` is present, it behaves like normal preview and shows/saves preview images.
+
+Best for:
+- optional image branches
+- workflows where some branches intentionally output `None`
 
 ## Simple Examples
 
