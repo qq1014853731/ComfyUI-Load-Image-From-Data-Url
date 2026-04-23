@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 
-const NODE_CLASS = "LoadImageFromURIBatch";
+const NODE_CLASSES = new Set(["LoadImageFromURIBatch", "LoadImageFromURIList"]);
 const URI_NAME_PATTERN = /^uri_(\d+)$/;
 const REMOVE_NAME_PATTERN = /^remove_uri_(\d+)$/;
 const CONTROL_WIDGET_NAMES = new Set(["add_uri", "remove_uri"]);
@@ -216,24 +216,25 @@ function ensureDefaultUriWidget(node) {
   }
 }
 
-function extractSerializedUriValues(info) {
+function extractSerializedUriValues(info, nodeData) {
   const values = info?.widgets_values;
   if (!Array.isArray(values)) {
     return [];
   }
 
   // Base widgets from Python are serialized first:
-  // timeout, max_download_bytes, output_mode, allow_empty.
+  // Batch: timeout, max_download_bytes, size_mode, allow_empty.
+  // List: timeout, max_download_bytes, allow_empty.
   // URI widgets are added by this extension after those base widgets.
-  const outputModes = new Set(["list_original", "batch_pad_to_max", "batch_resize_to_first", "batch_error"]);
-  return values.slice(outputModes.has(values[2]) ? 4 : 3).filter((value) => typeof value === "string");
+  const baseWidgetCount = nodeData.name === "LoadImageFromURIBatch" ? 4 : 3;
+  return values.slice(baseWidgetCount).filter((value) => typeof value === "string");
 }
 
 app.registerExtension({
   name: "ComfyUI.LoadImageFromURI.BatchDynamicURIs",
 
   async beforeRegisterNodeDef(nodeType, nodeData) {
-    if (nodeData.name !== NODE_CLASS) {
+    if (!NODE_CLASSES.has(nodeData.name)) {
       return;
     }
 
@@ -248,7 +249,7 @@ app.registerExtension({
 
     const originalConfigure = nodeType.prototype.configure;
     nodeType.prototype.configure = function (info) {
-      const uriValues = extractSerializedUriValues(info);
+      const uriValues = extractSerializedUriValues(info, nodeData);
       originalConfigure?.apply(this, arguments);
       this.serialize_widgets = true;
 

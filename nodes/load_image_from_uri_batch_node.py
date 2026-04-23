@@ -15,9 +15,9 @@ class LoadImageFromURIBatch(ImageNodeUtils):
                     "INT",
                     {"default": 0, "min": 0, "max": 2147483647, "step": 1048576},
                 ),
-                "output_mode": (
-                    ["list_original", "batch_pad_to_max", "batch_resize_to_first", "batch_error"],
-                    {"default": "list_original"},
+                "size_mode": (
+                    ["pad_to_max", "resize_to_first", "error"],
+                    {"default": "pad_to_max"},
                 ),
                 "allow_empty": ("BOOLEAN", {"default": False}),
             },
@@ -27,7 +27,6 @@ class LoadImageFromURIBatch(ImageNodeUtils):
 
     RETURN_TYPES = ("IMAGE", "MASK", "BOOLEAN", "INT")
     RETURN_NAMES = ("image", "mask", "has_image", "count")
-    OUTPUT_IS_LIST = (True, True, False, False)
     FUNCTION = "load_images_from_uri_batch"
     CATEGORY = "image"
 
@@ -37,14 +36,7 @@ class LoadImageFromURIBatch(ImageNodeUtils):
         match = re.match(r"^uri_(\d+)$", key)
         return (0, int(match.group(1))) if match else (1, key)
 
-    def load_images_from_uri_batch(
-        self,
-        timeout: int = 0,
-        max_download_bytes: int = 0,
-        output_mode: str = "list_original",
-        allow_empty: bool = False,
-        **kwargs,
-    ):
+    def collect_uri_list(self, kwargs):
         uri_list = []
         # Dynamic URI widgets arrive through kwargs because they are not declared
         # individually in INPUT_TYPES.
@@ -57,11 +49,22 @@ class LoadImageFromURIBatch(ImageNodeUtils):
             uri = uri.strip()
             if uri:
                 uri_list.append(uri)
+        return uri_list
+
+    def load_images_from_uri_batch(
+        self,
+        timeout: int = 0,
+        max_download_bytes: int = 0,
+        size_mode: str = "pad_to_max",
+        allow_empty: bool = False,
+        **kwargs,
+    ):
+        uri_list = self.collect_uri_list(kwargs)
 
         if not uri_list:
             if allow_empty:
                 image_tensor, mask_tensor = self.empty_comfy_tensors()
-                return ([image_tensor], [mask_tensor], False, 0)
+                return (image_tensor, mask_tensor, False, 0)
             raise ValueError("URI batch is empty. Add at least one non-empty URI item.")
 
         image_tensors = []
@@ -73,10 +76,6 @@ class LoadImageFromURIBatch(ImageNodeUtils):
             image_tensors.append(image_tensor)
             mask_tensors.append(mask_tensor)
 
-        if output_mode == "list_original":
-            return (image_tensors, mask_tensors, True, len(uri_list))
-
-        size_mode = output_mode.removeprefix("batch_")
         image_tensors, mask_tensors = self.normalize_batch_tensor_sizes(
             image_tensors,
             mask_tensors,
@@ -84,7 +83,7 @@ class LoadImageFromURIBatch(ImageNodeUtils):
         )
         batch_image = torch.cat(image_tensors, dim=0)
         batch_mask = torch.cat(mask_tensors, dim=0)
-        return ([batch_image], [batch_mask], True, len(uri_list))
+        return (batch_image, batch_mask, True, len(uri_list))
 
     def normalize_batch_tensor_sizes(self, image_tensors, mask_tensors, size_mode: str):
         sizes = [tuple(image_tensor.shape[1:3]) for image_tensor in image_tensors]
